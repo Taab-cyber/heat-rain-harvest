@@ -1,0 +1,25 @@
+# Reproducible environment. Versions pinned to what is installed in `hrh`
+# (checked 2026-11-21). Recreate with:  conda env create -f environment.yml
+name: hrh
+channels:
+  - conda-forge
+dependencies:
+  - python=3.12
+  - pandas=3.1.1
+  - numpy=2.5.4
+  - xarray=2026.9.0
+  - geopandas=1.2.0
+  - scikit-learn=1.9.1
+  - statsmodels=0.15.0
+  - shapely=2.2.0
+  - pyogrio=0.13.0
+  - requests=2.34.2
+  - scipy
+  - matplotlib
+  - seaborn
+  - netcdf4
+  - jupyter
+  - openpyxl
+  - pip
+  - pip:
+      - imdlib==0.4.0
