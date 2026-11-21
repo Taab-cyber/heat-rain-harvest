@@ -73,20 +73,28 @@ Same state list and same fallback (split the years) as APY.
 
 ---
 
-## C. District boundaries + LGD codes, needs your decision first
+## C. District boundaries + LGD codes (decision D6)
 
-See the "Boundaries" entry in DECISIONS.md. Don't download anything until
-you've picked an option.
+### C1. PC11 district polygons (analysis base), AIKosh
+1. Open https://aikosh.indiaai.gov.in/home/datasets/details/2011_population_census_district_polygon_geometries.html
+2. Click **Download (29.71 MB)**. If AIKosh asks you to sign in or register,
+   do that yourself and click Download again.
+3. Save the file **as delivered** (don't extract it) into `data/raw/boundaries/`,
+   e.g. `data/raw/boundaries/pc11_district_polygons.zip`.
+4. Also click **Download Metadata** and save it next to the ZIP. We cite it in the paper.
 
-If you choose **Survey of India** (recommended):
-1. Go to https://onlinemaps.surveyofindia.gov.in and register (free).
-   Account creation is yours to do; the team won't sign up for you.
-2. Open **Digital Products** and find the **Administrative Boundary Database**
-   (district level, whole country), priced at Rs 0.
-3. Add it to the cart, check out at Rs 0, and download the shapefile ZIP.
-4. Save the ZIP **unextracted** as `data/raw/boundaries/soi_districts.zip`.
+### C2. LGD districts (for post-2011 → 2011 mapping)
+Preferred (same portal): AIKosh dataset **"Local Government Directory (LGD) - Districts"**
+(linked under "Related Datasets" on the page above). Save to `data/raw/boundaries/lgd_districts.<ext>`.
 
-LGD district codes:
-1. Go to https://lgdirectory.gov.in → **Download Directory** → **All Districts of India**
-   (solve the captcha yourself; the team doesn't do captchas).
-2. Format CSV (or XLS). Save as `data/raw/boundaries/lgd_districts.csv`.
+Fallback: https://lgdirectory.gov.in → **Download Directory** → **All Districts of India**
+(you solve the captcha). Save as `data/raw/boundaries/lgd_districts.csv`.
+
+Record which one you used. The mapping only works if the file
+has a Census 2011 district code column, so check that on the real file.
+
+### C3. Survey of India (cross-check only, optional if short on time)
+1. Go to https://onlinemaps.surveyofindia.gov.in/Digital_Product_Show.aspx and register (free).
+   Creating the account is yours to do.
+2. Find the **Administrative Boundary Database** (district level, whole country), priced at Rs 0.
+3. Check out at Rs 0, download, and save the ZIP unextracted as `data/raw/boundaries/soi_districts.zip`.

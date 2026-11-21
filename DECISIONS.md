@@ -26,9 +26,16 @@ Each entry: what was chosen, the alternatives, and why. Newest at the bottom.
 - **Alternatives:** random K-fold (leaks future climate and trend information); leave-one-year-out (used as a secondary check).
 - **Why:** the forecasting use case predicts future years, so the test set must be in the future.
 
-## D6. Boundaries: PENDING, user decision needed
-Options:
-1. **Survey of India Administrative Boundary Database** (onlinemaps.surveyofindia.gov.in), free after registration. Official national mapping agency, current districts. Recommended.
-2. Census 2011 district maps: official, but the Census office does not publish free shapefiles. Only PDF maps are available, so this isn't usable without digitising.
-3. DataMeet / GitHub community shapefiles: easy to get but **not official**, so not allowed unless you approve.
-LGD codes: lgdirectory.gov.in (MoPR, official).
+## D6. Boundaries: fixed Census 2011 (PC11) districts (decided by Mehtaab, 2026-11-21)
+- **Chosen:** PC11 district polygons from AIKosh (Government of India IndiaAI portal),
+  https://aikosh.indiaai.gov.in/home/datasets/details/2011_population_census_district_polygon_geometries.html
+  Licence CC BY-NC-SA 4.0 (non-commercial academic use is OK). 29.71 MB.
+- **Cross-check only:** Survey of India Administrative Boundary Database, used to sanity-check outlines and as the official citation. Not the analysis base.
+- **Rejected:** DataMeet and GADM as direct sources (not official). Census office PDF maps (not machine-readable).
+- **Provenance, stated honestly in the paper:** the dataset card names Development Data Lab as the source organisation; AIKosh hosts it. The polygons are compiled from SEDAC, Bharatmaps, Datameet and the Administrative Atlas of India, with up to about 1 km boundary error in places.
+- **Method:** every dataset (APY, LUS, climate) is harmonised to fixed PC11 districts. Districts created after 2011 are mapped back to their 2011 parent through LGD codes and a documented mapping table (`data/interim/district_map_pc11.csv`, built in Phase 3). Area and production are summed and yield is recomputed as production / area. We never average yields.
+- **Why fixed 2011 units:** India went from about 640 districts (2011) to more than 750. Without fixed units, one district's time series breaks every time it is split, and yield shocks get confused with boundary changes.
+- **Known risk:** if a post-2011 district was carved out of *two* 2011 parents, it can't be assigned cleanly. These cases are listed in D6a (to be filled in during Phase 3) and mentioned in the paper's limitations.
+
+### D6a. Unmatched / ambiguous district cases
+To be filled in from the real data in Phase 3.
