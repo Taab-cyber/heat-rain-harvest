@@ -47,3 +47,19 @@ To be filled in from the real data in Phase 3.
 
 ## D3 verified (2026-11-24)
 All-crop APY long table = 406,612 rows (>= 50,000). Wheat + rice = 37,995 rows, which alone would not meet the requirement.
+
+## D8. IMD rainfall downloaded from IMD's own web page (Phase 2, 2026-11-24)
+- **Chosen:** download yearly 0.25 deg rainfall binaries from https://imdpune.gov.in/cmpg/Griddata/Rainfall_25_Bin.html in the browser; `src/collect_imd_rain.py` moves each file into imdlib's layout (`data/raw/imd/rain/<year>.grd`) only if its size is exactly 135 x 129 x days x 4 bytes.
+- **Alternatives:** imdlib's scripted download (failed for every rainfall year: IMD server dropped the SSL connection 8/8 times); unofficial mirrors (not allowed).
+- **Why:** same official IMD product, same file format; the size check guarantees no truncated file is used. tmax/tmin still come from imdlib.
+
+## D9. Land Use Statistics scope (Phase 2)
+- **Chosen:** export the classification groups "land use", "sources of irrigation" and "crop-wise irrigated area"; leave out "area under crops".
+- **Why:** "area under crops" duplicates APY and doubled the file size (Punjab 24.5 MB -> 12.8 MB). LUS starts at 1998-99, so irrigation is missing for 1997-98.
+
+## D10. Crop-wise irrigated area from LUS (Phase 3)
+- **Observed (not assumed):** the portal header gives irrigated rice the season sub-columns Autumn / Winter / Summer / Total (a few files use Kharif / Rabi). Header and data cell counts match (183 = 183), so this is the portal's own labelling (traditional aus / aman / boro rice seasons), not a parsing shift. E.g. Ludhiana 1998: 241,124 ha irrigated rice is filed under "Autumn".
+- **Chosen:** `rice_irrigated_ha` = portal Total if present, else the sum of the season columns present; same rule for `wheat_irrigated_ha`. Missing stays missing (never 0).
+- **Alternatives:** use one season column only (would undercount in states using Winter/Summer rice).
+- **Why:** gives one comparable irrigated-area number per district-year without relabelling the portal's data. Irrigation share = irrigated area (LUS) / crop area (APY), computed after both are on 2011 districts.
+- Dropped 950 "Total of <State>" rows (state sums).
