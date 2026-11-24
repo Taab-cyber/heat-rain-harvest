@@ -45,7 +45,7 @@ Every choice, with its alternatives, is in `DECISIONS.md` (D1-D19).
 ## 4. Key results
 **Heat hurts wheat, robustly.** With district and year fixed effects and district-clustered errors, +1 C in
 wheat-season night temperature goes with **-5.3% yield (95% CI -6.6 to -4.0)**; across eight robustness variants
--4.6% to -5.8%. Ten extra days above 35 C in March: -1.8% (p = 0.017). The 2021-22 heatwave cut Punjab and Haryana
+-4.5% to -5.8%. Ten extra days above 35 C in March: -1.8% (p = 0.017). The 2021-22 heatwave cut Punjab and Haryana
 wheat by **9.5%** below trend [-11.6, -7.4].
 
 **Irrigation protects rice from drought, clearly.** A monsoon 20% below normal costs about 3.1% of rice yield at 20%
