@@ -17,12 +17,15 @@ from src.config import INTERIM, RAW
 
 NUM_PREFIX = re.compile(r"^\s*\d+\.\s*")   # "1. Punjab" -> "Punjab"
 
+# Portal "crops" that are really sums of other crops; keeping them would double-count.
+AGGREGATE_CROPS = {"Oilseeds total", "Pulses total", "Total foodgrain", "Jute & mesta"}
+
 
 def parse_file(path) -> pd.DataFrame:
+    if b"No Data Found" in path.read_bytes():    # portal's empty-result page (e.g. Lakshadweep)
+        return pd.DataFrame()
     tables = pd.read_html(path, flavor="lxml")   # read_html expands rowspan/colspan
     wide = tables[0]
-    if wide.shape[1] < 4:                        # "No Data Found" page
-        return pd.DataFrame()
     ids = wide.iloc[:, :3].copy()
     ids.columns = ["state", "district", "year"]
     long_parts = []
@@ -50,6 +53,9 @@ def parse_file(path) -> pd.DataFrame:
 def main() -> None:
     frames = [parse_file(p) for p in sorted((RAW / "apy").glob("apy_*.xls"))]
     df = pd.concat([f for f in frames if len(f)], ignore_index=True)
+    n_agg = df.crop.isin(AGGREGATE_CROPS).sum()
+    df = df[~df.crop.isin(AGGREGATE_CROPS)]
+    print(f"dropped {n_agg:,} aggregate rows ({', '.join(sorted(AGGREGATE_CROPS))})")
     out = INTERIM / "apy_long.parquet"
     df.to_parquet(out, index=False)
     print(f"rows={len(df):,}  states={df.state.nunique()}  districts={df[['state','district']].drop_duplicates().shape[0]}  "

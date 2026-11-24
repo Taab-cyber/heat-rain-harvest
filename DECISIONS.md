@@ -39,3 +39,11 @@ Each entry: what was chosen, the alternatives, and why. Newest at the bottom.
 
 ### D6a. Unmatched / ambiguous district cases
 To be filled in from the real data in Phase 3.
+
+## D7. Drop portal aggregate "crops" (Phase 3)
+- **Chosen:** remove "Oilseeds total", "Pulses total", "Total foodgrain", "Jute & mesta" (1,193 rows) from the APY long table.
+- **Alternatives:** keep them as separate crops.
+- **Why:** they are sums of other crops in the same file, so keeping them double-counts area and production and inflates the row count used for the 50,000 requirement.
+
+## D3 verified (2026-11-24)
+All-crop APY long table = 406,612 rows (>= 50,000). Wheat + rice = 37,995 rows, which alone would not meet the requirement.
