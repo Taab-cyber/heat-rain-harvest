@@ -214,7 +214,7 @@ with tab_clim:
             fmn = go.Figure()
             fmn.add_bar(x=mn.year, y=mn.jjas_mm, name="June-September rain (mm)", marker_color="#6baed6")
             fmn.add_scatter(x=mn.year, y=mn.jjas_mm.rolling(10, center=True).mean(), name="10-yr mean", line=dict(color="#08519c", width=3))
-            fmn.update_layout(title="All-India monsoon rainfall, 1901-2025 (district-area weighted)", height=340)
+            fmn.update_layout(title="All-India monsoon rainfall, 1901-2025 (district-area weighted)", height=340, yaxis_range=[600, 1100])
             st.plotly_chart(fmn, use_container_width=True)
             mtr = T["monsoon_trends"]
             st.dataframe(mtr[mtr.period == "1951-2025"][["variable", "sen_per_decade", "mk_p"]].round(4),
