@@ -98,3 +98,34 @@ has a Census 2011 district code column, so check that on the real file.
    Creating the account is yours to do.
 2. Find the **Administrative Boundary Database** (district level, whole country), priced at Rs 0.
 3. Check out at Rs 0, download, and save the ZIP unextracted as `data/raw/boundaries/soi_districts.zip`.
+
+## D. Phase 10 extensions that need YOUR sign-in (not done automatically)
+These portals need an account, a captcha or a personal API key, so the downloads are done by the team members
+themselves. Put each file in the folder shown; the analysis code is then a short addition (DECISIONS D22).
+
+### D1. Groundwater levels (CGWB well observations), India-WRIS
+1. Open https://indiawris.gov.in/wris/ -> Ground Water -> Ground Water Level. Sign in (free account; captcha).
+2. Choose: all states, district-wise, seasons Pre-monsoon (May) and Post-monsoon (November), years 1996-2024.
+3. Download CSV/Excel per state into `data/raw/groundwater/`.
+- Plan: depth to water level per district, pre and post monsoon; recharge = pre minus post; trend per district
+  (Sen slope); link to tubewell share and to rice/wheat yields. Without login, CGWB's public pages only have single
+  years (2018-2019 district tables, 2021 KML, 2021-22 PDF reports): too few years for trends.
+
+### D2. Vegetation greenness (NDVI)
+- Preferred (Indian, government): ISRO NRSC Bhuvan / VEDAS (SAC) NDVI products: need a Bhuvan/VEDAS account.
+- Alternative: NASA MODIS MOD13A3 monthly NDVI 1 km (2000-present) via NASA Earthdata (free login). This is a
+  government source but not Indian: the team should confirm with the professor before we use it.
+- Put files in `data/raw/ndvi/`. Plan: district mean NDVI in Feb-Mar (wheat) and Aug-Sep (rice) as an in-season signal.
+
+### D3. Fertiliser, machinery, tubewells: Agricultural Input Survey (DES / Agriculture Census)
+- https://inputsurvey.dacnet.nic.in (district tables by survey round 2001-02, 2006-07, 2011-12, 2016-17).
+  Download district tables on fertiliser use per ha and tubewell/pumpset counts into `data/raw/input_survey/`.
+- Only 4 rounds -> usable as slow-changing district traits, not year-to-year drivers.
+
+### D4. Soil health
+- https://soilhealth.dac.gov.in : district summaries of N, P, K, organic carbon (cycles 2015-17, 2017-19). Static traits.
+
+### D5. Crop prices (MSP, mandi prices)
+- MSP: CACP price-policy reports (https://cacp.da.gov.in), national per crop and year: identical for all districts, so it
+  cannot explain district differences (it is absorbed by year effects).
+- Mandi prices: Agmarknet (https://agmarknet.gov.in) or data.gov.in with the team's own API key.
