@@ -15,7 +15,13 @@ import time
 from src.collect_download import DOWNLOADS, is_finished
 from src.config import RAW
 
-STATE_RE = re.compile(rb"<td[^>]*>\s*1\.\s*([^<]+?)\s*</td>")
+# kind -> (download filename pattern, regex for the state name inside the file, output prefix)
+KINDS = {
+    "apy": ("horizontal_crop_vertical_year_report*.xls",
+            re.compile(rb"<td[^>]*>\s*1\.\s*([^<]+?)\s*</td>"), "apy"),
+    "lus": ("grand_query_report_district_wise*.xls",
+            re.compile(rb'<span class="text-danger">\s*([^<]+?)\s*</span>'), "lus"),
+}
 
 
 def slug(s: str) -> str:
@@ -26,18 +32,19 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--expect", type=int, default=36)
     ap.add_argument("--idle", type=int, default=1800)
+    ap.add_argument("--kind", choices=KINDS, default="apy")
     a = ap.parse_args()
+    pattern, state_re, prefix = KINDS[a.kind]
     done, last = 0, time.time()
     while done < a.expect and time.time() - last < a.idle:
-        for f in sorted(DOWNLOADS.glob("horizontal_crop_vertical_year_report*.xls"),
-                        key=lambda p: p.stat().st_mtime):
+        for f in sorted(DOWNLOADS.glob(pattern), key=lambda p: p.stat().st_mtime):
             s1 = f.stat().st_size
             time.sleep(1.5)
             if f.stat().st_size != s1 or not is_finished(f):
                 continue
-            m = STATE_RE.search(f.read_bytes())
+            m = state_re.search(f.read_bytes())
             name = slug(m.group(1).decode()) if m else f"unknown_{int(time.time())}"
-            dest = RAW / "apy" / f"apy_{name}.xls"
+            dest = RAW / prefix / f"{prefix}_{name}.xls"
             if dest.exists():
                 dest = dest.with_name(dest.stem + f"_dup{int(time.time())}.xls")
             shutil.move(str(f), dest)
