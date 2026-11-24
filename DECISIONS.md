@@ -70,6 +70,14 @@ All-crop APY long table = 406,612 rows (>= 50,000). Wheat + rice = 37,995 rows, 
 - **Why:** gives one comparable irrigated-area number per district-year without relabelling the portal's data. Irrigation share = irrigated area (LUS) / crop area (APY), computed after both are on 2011 districts.
 - Dropped 950 "Total of <State>" rows (state sums).
 
+## D12. Crop irrigation share (Phase 3, 2026-11-24)
+- **Definition:** irr_share = crop-wise irrigated area (LUS) / crop area (APY), per unit-year. Seasons combined.
+- **Observed:** the two sources are collected separately, so the ratio can exceed 1. Wheat raw ratio median 0.98, 95th pct 1.16, 99th pct 10.0; rice median 0.78, 99th pct 1.48. Over-1.1 cases cluster in Odisha wheat (mostly < 2,000 ha) and Uttar Pradesh rice.
+- **Chosen:** clip 1.0-1.1 to 1.0 (rounding / timing differences); above 1.1 set missing and flag `irr_share_flag` (wheat 588, rice 394 unit-years).
+- **Sanity:** Punjab wheat median 1.00 every year; Bihar rice median rises from about 0.40 (1999) to 0.81 (2022).
+- **Alternatives:** clip everything to 1 (hides inconsistent data); use net irrigated / net sown (not crop-specific). The district-level `net_irr_intensity` is kept as a second irrigation measure for robustness.
+- LUS starts 1998-99, so irr_share is missing for 1997.
+
 ## D11. Implausible yields are flagged, not deleted (Phase 3, 2026-11-24)
 - **Observed:** e.g. Kolhapur rice 1997 = 224 t/ha, North/South Goa rice 2022 = 39-45 t/ha, Moga wheat 2008 = 7.46 t/ha. Real district-average yields are about 5-6 t/ha at most, so these are reporting/unit errors in the source.
 - **Chosen:** `yield_raw` keeps the computed value; `yield_flag` = True if yield > ceiling (wheat 7, rice 8 t/ha) or > 3x / < 1/3 of the unit's own median for that crop and season; `yield_clean` = yield with flagged values set to missing. Analyses use `yield_clean`.
