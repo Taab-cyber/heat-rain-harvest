@@ -7,3 +7,10 @@ __pycache__/
 *.pyc
 .env
 *.nc
+
+# derived app data (rebuild: python -m src.build_db)
+app/atlas.sqlite
+app/districts.geojson
+# derived Tableau exports (rebuild: python -m src.export_tableau)
+reports/tableau/*.csv
+reports/tableau/*.geojson
