@@ -18,13 +18,18 @@ from src.boundaries import load_pc11_districts
 from src.build_crop_panel import TRIPURA_UNIT
 from src.config import PROCESSED
 
-CROPS = {"Wheat": "wheat_irrigated_ha", "Rice": "rice_irrigated_ha"}
+CROPS = {"Wheat": "wheat_irrigated_ha", "Rice": "rice_irrigated_ha", "Rice (monsoon)": "rice_irrigated_ha"}
+# note: LUS irrigated rice covers all seasons, so irr_share for "Rice (monsoon)" is approximate
 
 
 def main() -> None:
     crop = pd.read_parquet(PROCESSED / "crop_panel_pc11.parquet")
     lus = pd.read_parquet(PROCESSED / "lus_panel_pc11.parquet")
     crop = crop[crop.crop.isin(CROPS) & (crop.production_unit == "Tonnes")]
+    # Extra "crop": monsoon-season rice only (kharif, autumn/aus, winter/aman), so the target
+    # matches the Jun-Oct weather window; boro/rabi/summer rice is excluded (D19).
+    monsoon = crop[(crop.crop == "Rice") & crop.season.isin(["Kharif", "Autumn", "Winter"])].assign(crop="Rice (monsoon)")
+    crop = pd.concat([crop, monsoon], ignore_index=True)
 
     # rows usable for yield = both area and production reported and not flagged
     ok = crop["yield_clean"].notna()
@@ -41,11 +46,12 @@ def main() -> None:
     # irrigation
     lus = lus.assign(net_irr_intensity=lus.net_irrigated_ha / lus.net_sown_ha.where(lus.net_sown_ha > 0))
     m = m.merge(lus, on=["unit_id", "year"], how="left")
-    m["crop_irrigated_ha"] = [r[CROPS[c]] for c, (_, r) in zip(m.crop, m[list(CROPS.values())].iterrows())]
+    irr_cols = sorted(set(CROPS.values()))
+    m["crop_irrigated_ha"] = [r[CROPS[c]] for c, (_, r) in zip(m.crop, m[irr_cols].iterrows())]
     share = m.crop_irrigated_ha / m.area_ha.where(m.area_ha > 0)
     m["irr_share_flag"] = share > 1.1
     m["irr_share"] = share.clip(upper=1.0).mask(m.irr_share_flag)
-    m = m.drop(columns=list(CROPS.values()))
+    m = m.drop(columns=sorted(set(CROPS.values())))
 
     # names
     names = load_pc11_districts()[["district_id", "state_id", "d_name"]].rename(columns={"district_id": "unit_id"})

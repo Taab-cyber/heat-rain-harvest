@@ -122,11 +122,18 @@ def crop_features(daily: pd.DataFrame, crop: str) -> pd.DataFrame:
         f["mar_hot_days_35"] = mar.hot35.sum(min_count=1)
         f["edd_mar"] = mar.edd.sum(min_count=1)
         f["rain_nov_jan"] = d[d.month.isin([11, 12, 1])].groupby(keys).rain.sum(min_count=1)
+        # Phase 8 feature iteration (D19): February heat and grain-filling heat above 30 C
+        f["feb_tmax_mean"] = d[d.month == 2].groupby(keys).tmax.mean()
+        fm = d[d.month.isin([2, 3])].assign(e30=lambda x: (x.tmax - 30).clip(lower=0))
+        f["edd30_feb_mar"] = fm.groupby(keys).e30.sum(min_count=1)
     else:
         jjas = d[d.month.isin([6, 7, 8, 9])].sort_values(keys + ["date"])
         f["rain_jun_sep"] = jjas.groupby(keys).rain.sum(min_count=1)
         f["longest_dry_spell"] = jjas.groupby(keys).rain.apply(lambda x: longest_run((x < RAINY_MM).to_numpy()))
         f["hot_days_35"] = g.hot35.sum(min_count=1)
+        # Phase 8 feature iteration (D19): monsoon rain by month (June = sowing/transplanting)
+        for mo, name in ((6, "rain_jun"), (7, "rain_jul"), (8, "rain_aug"), (9, "rain_sep")):
+            f[name] = d[d.month == mo].groupby(keys).rain.sum(min_count=1)
 
     # incomplete seasons -> missing (D13)
     temp_cols = [c for c in f.columns if c.startswith(("tmax", "tmin", "gdd", "edd", "mar_", "hot"))]
@@ -135,7 +142,16 @@ def crop_features(daily: pd.DataFrame, crop: str) -> pd.DataFrame:
     f.loc[f.rain_missing_share > 0.10, rain_cols] = np.nan
     expected = 151 if crop == "Wheat" else 153                    # days in the window (non-leap)
     f.loc[f.n_days < expected * 0.9, temp_cols + rain_cols] = np.nan   # season not fully in the data
-    return f.reset_index()
+    f = f.reset_index()
+    if crop == "Wheat":
+        # Preceding monsoon (Jun-Sep of year Y) recharges soil and groundwater for the rabi crop
+        # sown in November of Y: known before sowing, so valid for a pre-harvest forecast (D19).
+        mon = daily[daily.date.dt.month.isin([6, 7, 8, 9])].assign(year=lambda x: x.date.dt.year)
+        prev = mon.groupby(["unit_id", "year"]).rain.agg(["sum", lambda x: x.isna().mean()])
+        prev.columns = ["prev_monsoon_rain", "miss"]
+        prev.loc[prev.miss > 0.10, "prev_monsoon_rain"] = np.nan
+        f = f.merge(prev[["prev_monsoon_rain"]].reset_index(), on=["unit_id", "year"], how="left")
+    return f
 
 
 # ---------------------------------------------------------------- detrending
@@ -177,16 +193,22 @@ def detrend_train_only(m: pd.DataFrame, last_train_year: int = TRAIN_LAST_YEAR) 
 def main() -> None:
     daily = load_daily()
     master = pd.read_parquet(PROCESSED / "master_wheat_rice.parquet")
+    feats = {}
     for crop in SEASONS:
-        f = crop_features(daily, crop)
-        f.to_parquet(PROCESSED / f"features_{crop.lower()}.parquet", index=False)
+        feats[crop] = crop_features(daily, crop)
+        feats[crop].to_parquet(PROCESSED / f"features_{crop.lower()}.parquet", index=False)
+    # "Rice (monsoon)" = kharif/autumn/winter rice only, matched to the Jun-Oct window (D19)
+    for crop, fkey, fname in (("Wheat", "Wheat", "wheat"), ("Rice", "Rice", "rice"), ("Rice (monsoon)", "Rice", "rice_monsoon")):
+        if crop not in set(master.crop):
+            continue
+        f = feats[fkey]
         m = master[master.crop == crop].merge(f, on=["unit_id", "year"], how="left")
         m = detrend_full(m.sort_values(["unit_id", "year"]).reset_index(drop=True))
         # D14: analysis sample = crop area >= MIN_AREA_HA and a clean yield (tiny areas give noisy yields)
         m["in_sample"] = (m.area_ha >= MIN_AREA_HA) & m.yield_t_ha.notna()
         # yield-loss event: more than LOSS_THRESHOLD below the (descriptive) trend
         m["yield_loss"] = (m.yield_rel_anom < -LOSS_THRESHOLD).where(m.yield_rel_anom.notna())
-        m.to_parquet(PROCESSED / f"model_{crop.lower()}.parquet", index=False)
+        m.to_parquet(PROCESSED / f"model_{fname}.parquet", index=False)
         s = m[m.in_sample]
         print(f"{crop}: feature rows {len(f):,}; model rows {len(m):,}; in analysis sample {len(s):,} "
               f"({s.unit_id.nunique()} units); with all weather {s.dropna(subset=['gdd', 'rain_total']).shape[0]:,}; "

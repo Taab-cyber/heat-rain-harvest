@@ -70,6 +70,23 @@ All-crop APY long table = 406,612 rows (>= 50,000). Wheat + rice = 37,995 rows, 
 - **Why:** gives one comparable irrigated-area number per district-year without relabelling the portal's data. Irrigation share = irrigated area (LUS) / crop area (APY), computed after both are on 2011 districts.
 - Dropped 950 "Total of <State>" rows (state sums).
 
+## D19. Feature-engineering iteration and model choice (Phase 8, 2026-11-24)
+- **Trigger:** first run (D18) barely beat the trend-only baseline for wheat (best +4% skill) and not at all for rice; models did not help in the 2021-22 heatwave year.
+- **Diagnosis:** 2018-22 yields came in +8.5% (wheat) / +6% (rice) above the 1997-2017 trend, a common shift no weather variable can explain; rice yield mixed dry-season (boro/rabi) rice with a monsoon-only weather window.
+- **Tried (agronomy-driven):** wheat: February tmax, extreme degree days above 30 C in Feb-Mar, preceding monsoon (Jun-Sep) rain; rain as log(1 + mm) so deviations are ~% of normal; rice: monsoon-season rice only ("Rice (monsoon)" = Kharif + Autumn + Winter seasons), monthly monsoon rain.
+- **Selection rule:** feature version chosen by leave-years-out CV on **training years only** (not on the test set, to avoid test-set overfitting). CV skill (Ridge): wheat v1 +0.6%, v2 +1.6% -> v2; rice all-seasons v1 +2.0%, monsoon v1 +2.1%, monsoon v2 +0.2% -> monsoon v1. A few test-set looks happened before this rule was adopted; this is disclosed.
+- **Finding:** weather explains only about 1-2% of out-of-sample yield-anomaly variance. This is consistent with Phase 6: effects are significant but small relative to other year-to-year noise (anomaly sd about 19%; a typical +/-0.5 C night-temperature swing moves yield about +/-2%).
+- **Limitation:** LUS irrigated rice covers all seasons, so irr_share for monsoon rice is approximate (more > 1.1 flags: 1,453).
+
+## D18. Prediction set-up (Phase 8)
+- **Split:** train 1997-2017, test 2018-2022 (time-based; D5). Hyper-parameters by GroupKFold over training years.
+- **Target:** relative anomaly vs the train-only trend; yield_hat = trend_train x (1 + anomaly_hat). Baseline = trend_train.
+- **Leak-free features:** within-district deviations from training-year means; irrigation = district's training-period mean share (same-year LUS irrigation is not known before harvest).
+- **Models:** FE regression (OLS on within features + irrigation interactions), Ridge (alpha by CV), Random forest and HistGradientBoosting (small grids), loss classifiers (logistic balanced, GBM) vs the district's historical loss frequency.
+- **Metrics:** RMSE, MAE (t/ha), skill vs baseline = 1 - MSE/MSE_baseline, correlation of anomalies; classifier ROC-AUC, PR-AUC, Brier.
+- **Pre-harvest wheat forecast:** the wheat window ends 31 March and the preceding monsoon is known before sowing, so the wheat model is a pre-harvest forecast by construction (harvest is April).
+- **Warming scenarios:** +1 / +2 C added to every daily tmax and tmin, features recomputed from daily data, applied to the 2018-22 seasons with the FE regression; rain unchanged, no adaptation (same sowing dates, varieties, irrigation). Extrapolation beyond observed variation is a stated limitation.
+
 ## D17. Pattern finding choices (Phase 7, 2026-11-24)
 - **Unit and period:** one row per district, profiles from 1997-2017 only (`src/profiles.py`), so zones, propagated labels and selected features never use test years. Wheat profile needs >= 15 sample years (368 districts). Missing irrigation mean (17 districts) filled with the median.
 - **Features for zones:** hot_days_mean, tmin_mean, rain_cv, yield_mean, yield_trend_kg, anom_sd, loss_share, heat_sens, irr_mean, all z-scored.
