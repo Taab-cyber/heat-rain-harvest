@@ -70,6 +70,15 @@ All-crop APY long table = 406,612 rows (>= 50,000). Wheat + rice = 37,995 rows, 
 - **Why:** gives one comparable irrigated-area number per district-year without relabelling the portal's data. Irrigation share = irrigated area (LUS) / crop area (APY), computed after both are on 2011 districts.
 - Dropped 950 "Total of <State>" rows (state sums).
 
+## D17. Pattern finding choices (Phase 7, 2026-11-24)
+- **Unit and period:** one row per district, profiles from 1997-2017 only (`src/profiles.py`), so zones, propagated labels and selected features never use test years. Wheat profile needs >= 15 sample years (368 districts). Missing irrigation mean (17 districts) filled with the median.
+- **Features for zones:** hot_days_mean, tmin_mean, rain_cv, yield_mean, yield_trend_kg, anom_sd, loss_share, heat_sens, irr_mean, all z-scored.
+- **k:** chosen by the best silhouette over k = 2..8 -> **k = 5** (silhouette 0.292; agreement with Ward clustering ARI = 0.61). A first run with a fixed k = 4 had silhouette 0.224 and ARI 0.43, so it was replaced. Zones are ordered by observed loss share and named by profile.
+- **Label propagation:** label "high risk" = loss years >= 30% of 1997-2017; kNN graph (k = 10) on 6 climate-only features for 637 districts; LabelSpreading alpha = 0.2. Validation (hide 30% of labels, 30 repeats): balanced accuracy 0.64 vs 0.59 (supervised kNN) vs 0.50 (chance). Modest; propagated values are climate-similarity guesses, not observed losses.
+- **Feature selection (train years only):** within-district deviations; 3 votes (mutual information top-6, Lasso nonzero with year-grouped CV, RF permutation importance top-6), keep >= 2 votes, then drop one of any pair with |r| > 0.85. Selected: gdd, mar_tmax_mean, tmin_mean, rain_total.
+- **Warning recorded:** RF permutation importance was negative for most features on held-out years and Lasso kept only tmin_mean, so weather explains little of out-of-sample year-to-year variation. Phase 8 must check honestly whether any model beats the trend-only baseline.
+- **Alternatives:** DBSCAN (no k, but density varies a lot between regions); Gaussian mixtures; UMAP (not installed).
+
 ## D16. Which inference to trust (Phase 6, 2026-11-24)
 - **Problem:** district-years are not independent (same district over years, same weather across neighbours), and anomalies are heavy-tailed (excess kurtosis about 23). Simple t/ANOVA/chi-square p-values are therefore too optimistic.
 - **Chosen as the main test:** OLS with district fixed effects + year fixed effects, standard errors clustered by district (statsmodels `cov_type="cluster"`), plus a cluster bootstrap (resample districts, 2,000 draws, seed 42) for key differences. Simple tests are shown for teaching and as consistency checks.
