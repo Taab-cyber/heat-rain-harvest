@@ -21,6 +21,7 @@ Each entry: what was chosen, the alternatives, and why. Newest at the bottom.
 - **Chosen:** area-weighted district average, where each cell's weight is the share of district area falling in that cell. For small districts that sit inside a single 1 deg cell (about 110 km), the district gets that cell's value.
 - **Alternatives:** nearest cell to the centroid; bilinear interpolation to 0.25 deg first.
 - **Why:** area weighting is consistent with how rainfall is handled, and it doesn't invent sub-grid detail. Limitation, recorded honestly: neighbouring small districts often share identical temperature values, which reduces the effective number of independent temperature observations. We will report how many districts share a cell.
+- **Result (2026-11-24):** tmax/tmin: 640 districts, **64 served by a single 1 deg cell**, median 3 cells per district. Rain: 636 districts, 6 single-cell, median 14 cells. The 4 island districts (Nicobars, North & Middle Andaman, South Andaman, Lakshadweep) have no rainfall: the IMD 0.25 deg grid does not cover them. About 0.4% of daily temperature values are missing (district-days with no cell data that day).
 
 ## D5. Time-based validation: train <= 2017, test 2018-2022 (planned, Phase 8)
 - **Alternatives:** random K-fold (leaks future climate and trend information); leave-one-year-out (used as a secondary check).
@@ -37,8 +38,13 @@ Each entry: what was chosen, the alternatives, and why. Newest at the bottom.
 - **Why fixed 2011 units:** India went from about 640 districts (2011) to more than 750. Without fixed units, one district's time series breaks every time it is split, and yield shocks get confused with boundary changes.
 - **Known risk:** if a post-2011 district was carved out of *two* 2011 parents, it can't be assigned cleanly. These cases are listed in D6a (to be filled in during Phase 3) and mentioned in the paper's limitations.
 
-### D6a. Unmatched / ambiguous district cases
-To be filled in from the real data in Phase 3.
+### D6a. Unmatched / ambiguous district cases (status 2026-11-24)
+- Route used: source name -> LGD current district (exact name within state family, or a reviewed alias listed in `src/district_map.py`) -> LGD "Census 2011 Code" -> PC11 polygon.
+- APY: 634 names reach a 2011 district; 113 are post-2011 districts (LGD Census 2011 Code = 0) still needing a parent; 0 unmatched.
+- LUS: 690 reach a 2011 district; 104 post-2011; 1 unmatched ("Warangal urban", Telangana; post-2011, renamed Hanumakonda; parent = Warangal).
+- Mahe and Yanam (Puducherry) are Census 2011 districts that LGD no longer lists; linked directly to PC11 codes 636 and 634.
+- Census districts reached by no crop/LUS name: the 9 Delhi districts and Kolkata (urban, no crop records). Correctly absent.
+- **Open:** parents of the post-2011 districts. Planned source: LGD "Download Only Modifications" report (official split/merge history). Until then they are excluded from district-level analysis, and this is stated.
 
 ## D7. Drop portal aggregate "crops" (Phase 3)
 - **Chosen:** remove "Oilseeds total", "Pulses total", "Total foodgrain", "Jute & mesta" (1,193 rows) from the APY long table.
@@ -68,5 +74,6 @@ All-crop APY long table = 406,612 rows (>= 50,000). Wheat + rice = 37,995 rows, 
 - **What happened:** AIKosh requires a registered login for every file (even the 10-byte .cpg), and the login could not be completed in the automated Chrome profile.
 - **Chosen:** the same dataset, "PC11 District Polygons" (SHRUG Open Polygons, Development Data Lab), from its publisher's public download page https://www.devdatalab.org/shrug_download/ (module "Open Polygons and Spatial Statistics", SHP). AIKosh's own dataset card names Development Data Lab as the source and calls the files "version 2.1 of the SHRUG"; DDL's page currently serves SHRUG 2.2.
 - **Not a change of dataset:** same producer, same Census 2011 district polygons, same licence (CC BY-NC-SA 4.0). Still no GADM or DataMeet as a direct source.
+- **Downloaded file:** `shrug-pc11dist-poly-shp.zip` = SHRUG **version 2.2** (README). 641 features = 640 Census 2011 districts + 1 unnamed, unassigned J&K feature (pc11_d_id 000), which is dropped in `src/boundaries.py`. All 628 Census 2011 codes reached via LGD exist in the polygons.
 - **For the paper:** source = Development Data Lab SHRUG Open Polygons (also hosted on AIKosh, GoI); cite Asher, Lunt, Matsuura & Novosad, "Development research at high geographic resolution: an analysis of night-lights, firms, and poverty in India using the SHRUG open data platform", World Bank Economic Review (the citation DDL asks for). The exact version used is recorded from the downloaded files.
 - **Check before use:** compare the district count and names with Census 2011 (640 districts) and with the AIKosh file list (district.shp/.dbf/.shx/.prj).
