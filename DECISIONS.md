@@ -70,6 +70,12 @@ All-crop APY long table = 406,612 rows (>= 50,000). Wheat + rice = 37,995 rows, 
 - **Why:** gives one comparable irrigated-area number per district-year without relabelling the portal's data. Irrigation share = irrigated area (LUS) / crop area (APY), computed after both are on 2011 districts.
 - Dropped 950 "Total of <State>" rows (state sums).
 
+## D15. Madhya Pradesh area/production series break from 2018 (Phase 5, 2026-11-24)
+- **Observed:** MP wheat area in APY: 5.8 Mha (2017), 7.7 (2018), 10.2 (2019), about 9.5-9.8 after. District examples: Shivpuri 76,900 ha (2017) -> 311,478 ha (2019); Mandsaur 86,300 -> 238,130. Exactly one APY row per district-season, so this is in the source, not a processing double count. Production rose with area, so district **yields** stay in their usual range (Shivpuri 2.7-3.3, Rajgarh 2.9-3.5 t/ha).
+- **Interpretation:** a break in the reported area/production series (cause not determinable from the data: real expansion or a change in collection). Not assumed either way.
+- **Chosen:** (1) national/regional averages use fixed area weights (each unit's 1997-2017 mean area) so reporting changes cannot shift them; (2) all regressions include year fixed effects; (3) Phase 8 robustness check excluding MP 2018+.
+- **Side effect found:** with fixed weights, the 1997-2022 trend in mean March tmax over wheat districts is about 0 (+0.01 C/decade) and March hot days rise only +0.28 days/decade. The earlier "+0.28 C/decade" came from changing weights. Short window; the warming scenarios rely on estimated sensitivities, not on this trend.
+
 ## D13. Crop-season windows and weather features (Phase 4, 2026-11-24)
 - **Wheat (rabi):** 1 Nov Y to 31 Mar Y+1. Ends on 31 March so the same window serves the pre-harvest forecast (weather only up to end of March). Alternative: Nov-Apr (more complete, but April is after the forecast cutoff and overlaps harvest).
 - **Rice (kharif):** 1 Jun to 31 Oct Y; dry spells counted Jun-Sep (core monsoon). Alternative: state-specific crop calendars (better, but no single official machine-readable calendar for all districts). Limitation: rice yield combines all seasons (rabi/summer rice in the east and south), while the weather window is kharif only.
