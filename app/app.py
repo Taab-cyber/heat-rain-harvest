@@ -32,6 +32,10 @@ def load():
     with sqlite3.connect(DB) as con:
         t = {n: pd.read_sql(f"select * from {n}", con) for n in
              ("districts", "yields", "climate", "sensitivity", "scenarios", "forecasts", "meta")}
+        have = {r[0] for r in con.execute("select name from sqlite_master where type='table'")}
+        for n in ("clim_annual", "clim_trends", "clim_winters", "clim_hot_days", "clim_records", "clim_district_trends",
+                  "monsoon_annual", "monsoon_trends", "harvest_link"):
+            t[n] = pd.read_sql(f"select * from {n}", con) if n in have else None
     t["geo"] = json.loads(GEOJSON.read_text())
     t["districts"]["state"] = t["districts"].state_id.map(STATES).fillna("Other")
     return t
@@ -64,7 +68,7 @@ if crop == "Wheat":
     layer_df["risk_score_src"] = np.where(layer_df.risk_score.notna(), "observed loss share", np.where(prop.notna(), "propagated (climate similarity)", None))
     layer_df["risk_score"] = layer_df.risk_score.fillna(prop)
 
-tab_map, tab_d, tab_about = st.tabs(["🗺️ Map", "📍 District", "ℹ️ About & caveats"])
+tab_map, tab_d, tab_clim, tab_about = st.tabs(["🗺️ Map", "📍 District", "🌡️ Climate 1901-2025", "ℹ️ About & caveats"])
 
 # ------------------------------------------------------------------ map
 with tab_map:
@@ -155,6 +159,71 @@ with tab_d:
         st.dataframe(show.round(2), hide_index=True, use_container_width=True)
         st.caption("Out of sample, the weather model is only marginally better than the trend for wheat (+1.8% skill) and "
                    "not better for rice. It did not anticipate the 2021-22 Punjab-Haryana heat losses.")
+
+# ------------------------------------------------------------------ long-run climate
+with tab_clim:
+    if T["clim_annual"] is None:
+        st.info("Long-run climate tables not built yet: run `python -m src.climate_trends` then `python -m src.build_db`.")
+    else:
+        ca, ct = T["clim_annual"], T["clim_trends"]
+        a = ct[(ct.period == "annual")].set_index("variable")
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("Mean temperature trend", f"{a.loc['tmean', 'sen_per_decade']:+.2f} °C/dec", help="Sen's slope, 1951-2025")
+        c2.metric("Night (tmin) trend", f"{a.loc['tmin', 'sen_per_decade']:+.2f} °C/dec")
+        c3.metric("Warming so far", f"{a.loc['tmean', 'sen_per_decade'] * 7.4:+.2f} °C", help="slope x 74 years")
+        hot = T["clim_records"]
+        c4.metric("Hottest year", str(int(hot.year.iloc[0])), f"{hot.tmean_anom_vs_1951_80.iloc[0]:+.2f} °C vs 1951-80")
+        f = go.Figure()
+        for v, col in (("tmax", "#d62728"), ("tmin", "#1f77b4"), ("tmean", "#333")):
+            s = ca[f"{v}_anom_vs_1951_80"]
+            f.add_scatter(x=ca.year, y=s, name=v, line=dict(color=col, width=1), opacity=.45)
+            f.add_scatter(x=ca.year, y=s.rolling(10, center=True).mean(), name=f"{v} 10-yr mean", line=dict(color=col, width=3))
+        f.update_layout(title="All-India temperature anomaly vs 1951-1980 (°C)", height=380, margin=dict(t=40, b=10))
+        st.plotly_chart(f, use_container_width=True)
+
+        months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+        mt = ct[(ct.variable == "tmean") & ct.period.isin(months)].set_index("period").loc[months].reset_index()
+        mt["significant (5%)"] = np.where(mt.mk_p < .05, "yes", "no")
+        left, right = st.columns(2)
+        left.plotly_chart(px.bar(mt, x="period", y="sen_per_decade", color="significant (5%)",
+                                 color_discrete_map={"yes": "#d62728", "no": "#bbb"},
+                                 labels={"period": "", "sen_per_decade": "°C per decade"},
+                                 title="Warming by month, 1951-2025").update_layout(height=330), use_container_width=True)
+        w = T["clim_winters"]
+        fw = go.Figure()
+        fw.add_scatter(x=w.season, y=w.cool_days, name="cool days", line=dict(width=1))
+        fw.add_scatter(x=w.season, y=w.cool_days.rolling(10, center=True).mean(), name="10-yr mean", line=dict(width=3))
+        fw.update_layout(title="Cool days per winter (Oct-Mar, colder than the coolest quarter of the year in 1951-80)", height=330)
+        right.plotly_chart(fw, use_container_width=True)
+
+        dtr = T["clim_district_trends"]
+        if dtr is not None:
+            fm = px.choropleth(dtr.merge(D[["unit_id", "d_name"]], on="unit_id"), geojson=T["geo"], locations="unit_id",
+                               featureidkey="properties.unit_id", color="tmin_per_decade", color_continuous_scale="RdBu_r",
+                               range_color=(-.25, .25), hover_name="d_name", labels={"tmin_per_decade": "°C / decade"},
+                               title="Night-time (tmin) warming by district, 1951-2025")
+            fm.update_geos(fitbounds="locations", visible=False).update_layout(height=520, margin=dict(t=40, b=0))
+            st.plotly_chart(fm, use_container_width=True)
+            r = dtr[dtr.unit_id == uid]
+            if len(r):
+                st.write(f"**{pick}**: day-time {r.tmax_per_decade.iloc[0]:+.2f} °C/decade, "
+                         f"night-time {r.tmin_per_decade.iloc[0]:+.2f} °C/decade (1951-2025).")
+
+        if T["monsoon_annual"] is not None:
+            mn = T["monsoon_annual"]
+            fmn = go.Figure()
+            fmn.add_bar(x=mn.year, y=mn.jjas_mm, name="June-September rain (mm)", marker_color="#6baed6")
+            fmn.add_scatter(x=mn.year, y=mn.jjas_mm.rolling(10, center=True).mean(), name="10-yr mean", line=dict(color="#08519c", width=3))
+            fmn.update_layout(title="All-India monsoon rainfall, 1901-2025 (district-area weighted)", height=340)
+            st.plotly_chart(fmn, use_container_width=True)
+            mtr = T["monsoon_trends"]
+            st.dataframe(mtr[mtr.period == "1951-2025"][["variable", "sen_per_decade", "mk_p"]].round(4),
+                         hide_index=True, use_container_width=True)
+        if T["harvest_link"] is not None:
+            st.markdown("#### What the warming already means for harvests")
+            st.dataframe(T["harvest_link"].round(3), hide_index=True, use_container_width=True)
+            st.caption("Season night warming (1996-2025 vs 1951-80) x the Phase 8 night-heat coefficient. Back-of-envelope: "
+                       "assumes today's sensitivity held earlier; ignores adaptation, new varieties and CO2.")
 
 # ------------------------------------------------------------------ about
 with tab_about:

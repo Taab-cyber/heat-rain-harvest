@@ -95,6 +95,19 @@ def main() -> None:
         for name, df in (("districts", districts), ("yields", yields), ("climate", climate), ("sensitivity", sens),
                          ("scenarios", scen), ("forecasts", fc), ("meta", pd.DataFrame(meta.items(), columns=["key", "value"]))):
             df.to_sql(name, con, if_exists="replace", index=False)
+        # Phase 10 long-run climate tables (written only if `src.climate_trends` etc. have been run)
+        CL = PROCESSED / "climate"
+        extra = {"clim_annual": "national_annual.csv", "clim_trends": "national_trends.csv",
+                 "clim_winters": "national_winters.csv", "clim_hot_days": "national_hot_days.csv",
+                 "clim_records": "record_hot_years.csv", "monsoon_annual": "monsoon_national_annual.csv",
+                 "monsoon_trends": "monsoon_national_trends.csv", "harvest_link": "harvest_link_summary.csv"}
+        for name, f in extra.items():
+            if (CL / f).exists():
+                pd.read_csv(CL / f).to_sql(name, con, if_exists="replace", index=False)
+        if (CL / "district_trends.parquet").exists():
+            dtr = pd.read_parquet(CL / "district_trends.parquet")
+            dtr[dtr.period == "annual"].drop(columns="period").rename(columns={"district_id": "unit_id"}).to_sql(
+                "clim_district_trends", con, if_exists="replace", index=False)
         con.execute("CREATE INDEX IF NOT EXISTS ix_y ON yields(unit_id, crop)")
         con.execute("CREATE INDEX IF NOT EXISTS ix_c ON climate(unit_id, crop)")
         con.execute("CREATE INDEX IF NOT EXISTS ix_s ON scenarios(unit_id, crop)")

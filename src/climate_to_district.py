@@ -75,16 +75,31 @@ def aggregate(da, w: pd.DataFrame) -> pd.DataFrame:
     return pd.concat(out, ignore_index=True)
 
 
-def run(var: str, districts: gpd.GeoDataFrame, start: int, end: int) -> None:
-    da = load_grid(var, start, end)
-    if var in ("tmax", "tmin"):
-        da = clean_temperature(da)
-    w = build_weights(da, districts, var)
-    w.to_parquet(INTERIM / f"grid_weights_{var}.parquet", index=False)
+def run(var: str, districts: gpd.GeoDataFrame, start: int, end: int, tag: str = "") -> None:
+    """tag='' -> the 1997-2023 files used by the crop models; tag='longrun' -> separate
+    long-run files (Phase 10), so the crop-model inputs stay exactly reproducible."""
+    # Long periods are processed 10 years at a time: 125 years of the 0.25 deg rain grid would need
+    # about 6 GB of memory at once. Weights come from the first chunk (the IMD land mask is fixed).
+    chunks = [(y, min(y + 9, end)) for y in range(start, end + 1, 10)]
+    parts, w = [], None
+    for c0, c1 in chunks:
+        da = load_grid(var, c0, c1)
+        if var in ("tmax", "tmin"):
+            da = clean_temperature(da)
+        if w is None:
+            w = build_weights(da, districts, var)
+        part = aggregate(da, w)
+        part["value"] = part["value"].astype("float32")
+        parts.append(part)
+        del da
+    sfx = f"_{tag}" if tag else ""
+    w.to_parquet(INTERIM / f"grid_weights_{var}{sfx}.parquet", index=False)
     ncell = w.groupby("district_id").size()
-    print(f"{var}: districts={ncell.size}, served by a single cell={int((ncell == 1).sum())}, "
-          f"median cells per district={int(ncell.median())}")
-    aggregate(da, w).to_parquet(INTERIM / f"climate_{var}_daily.parquet", index=False)
+    print(f"{var}{sfx}: districts={ncell.size}, served by a single cell={int((ncell == 1).sum())}, "
+          f"median cells per district={int(ncell.median())}, years {start}-{end}")
+    out = pd.concat(parts, ignore_index=True)
+    out["value"] = out["value"].astype("float32")              # halves the file; 0.01 C / 0.01 mm precision kept
+    out.to_parquet(INTERIM / f"climate_{var}{sfx}_daily.parquet", index=False)
 
 
 def main() -> None:
@@ -93,10 +108,11 @@ def main() -> None:
     ap.add_argument("--vars", nargs="+", default=["tmax", "tmin", "rain"])
     ap.add_argument("--start", type=int, default=1997)
     ap.add_argument("--end", type=int, default=2023)
+    ap.add_argument("--tag", default="", help="'longrun' writes climate_<var>_longrun_daily.parquet")
     a = ap.parse_args()
     districts = load_pc11_districts()
     for var in a.vars:
-        run(var, districts, a.start, a.end)
+        run(var, districts, a.start, a.end, a.tag)
 
 
 if __name__ == "__main__":
