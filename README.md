@@ -79,7 +79,7 @@ streamlit run app/app.py             # then open http://localhost:8501
 No LaTeX is installed in WSL. Upload `reports/paper/paper.tex`, `reports/paper/references.bib` and the
 `reports/figures/` folder to Overleaf (IEEEtran is built in), or install TeX Live and run
 `pdflatex paper && bibtex paper && pdflatex paper && pdflatex paper` in `reports/paper/`.
-**Check every reference against the original publication before submitting.**
+References were checked against publisher records on 2026-11-24 (DOIs in references.bib).
 
 ## 7. Reproducibility notes
 - Random seed 42 everywhere (`src/config.py`).
