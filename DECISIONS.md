@@ -70,6 +70,16 @@ All-crop APY long table = 406,612 rows (>= 50,000). Wheat + rice = 37,995 rows, 
 - **Why:** gives one comparable irrigated-area number per district-year without relabelling the portal's data. Irrigation share = irrigated area (LUS) / crop area (APY), computed after both are on 2011 districts.
 - Dropped 950 "Total of <State>" rows (state sums).
 
+## D6c. 2011 parents of post-2011 districts via sub-districts (2026-11-24)
+- **Problem:** LGD gives "Census 2011 Code = 0" for 152 districts created after 2011, and LGD's "Download Only Modifications" report (kept in data/raw/boundaries/) has no "carved from" column.
+- **Chosen:** tehsil route. LGD "All Sub-Districts of India" gives each current tehsil's current district and Census 2011 sub-district code; SHRUG PC11 sub-district file gives each 2011 sub-district's 2011 district. A new district's parent = the 2011 district that most of its tehsils came from (`src/post2011_parents.py`). Exact ties: lower PC11 code wins, flagged `parent_tie`.
+- **Validation:** applied to the 627 districts that existed in 2011, the route reproduces LGD's own Census 2011 code for 625 (99.7%); the 2 misses are New Delhi and Chennai (urban, no crop data).
+- **Result:** of 152 post-2011 districts, 117 single parent, 27 split across 2-3 parents (majority parent used; share stored in `parent_share`), 8 with no tehsil carrying a 2011 code.
+- In our data: APY 87 single-parent + 22 split-parent names; LUS 80 + 21.
+- **Tripura:** its 4 districts created in 2012 (Gomati, Khowai, Sepahijala, Unakoti) have no tehsil with a 2011 code, so no parent can be determined. Chosen: aggregate all of Tripura into one unit for analysis (instead of guessing parents).
+- **Limitation (paper):** for split districts, all of the new district's area and production is credited to the majority parent, which misallocates a minority share. Robustness check planned in Phase 8: re-run excluding every 2011 district touched by a split child.
+- **Alternative considered:** merging all parents linked by split children into composite units. Rejected as primary because chains (e.g. Telangana 534/535/540/541) would merge large areas and lose resolution; kept as a possible robustness check.
+
 ## D6b. PC11 polygons downloaded from the original producer, not the AIKosh copy (2026-11-24)
 - **What happened:** AIKosh requires a registered login for every file (even the 10-byte .cpg), and the login could not be completed in the automated Chrome profile.
 - **Chosen:** the same dataset, "PC11 District Polygons" (SHRUG Open Polygons, Development Data Lab), from its publisher's public download page https://www.devdatalab.org/shrug_download/ (module "Open Polygons and Spatial Statistics", SHP). AIKosh's own dataset card names Development Data Lab as the source and calls the files "version 2.1 of the SHRUG"; DDL's page currently serves SHRUG 2.2.

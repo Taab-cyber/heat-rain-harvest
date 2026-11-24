@@ -96,6 +96,9 @@ DISTRICT_ALIASES = {
     "24 paraganas north": "North 24 Parganas", "24 paraganas south": "South 24 Parganas",
     "Dinajpur dakshin": "Dakshin Dinajpur", "Dinajpur uttar": "Uttar Dinajpur", "Maldah": "Malda",
     "Medinipur east": "Purba Medinipur", "Medinipur west": "Paschim Medinipur",
+    # Telangana: Warangal Urban was renamed Hanumakonda (2021, with boundary changes);
+    # both are post-2011 districts, so the parent comes from post2011_parents anyway.
+    "Warangal urban": "Hanumakonda",
 }
 
 
@@ -159,8 +162,20 @@ def main() -> None:
         if c not in m:
             m[c] = pd.NA
     m["match_type"] = "unmatched"
-    m.loc[m.pc11_district_code.notna(), "match_type"] = "pc11_code"                   # has a 2011 district
-    m.loc[m.lgd_district_code.notna() & m.pc11_district_code.isna(), "match_type"] = "post2011_needs_parent"
+    m.loc[m.pc11_district_code.notna(), "match_type"] = "pc11_code"                   # existed in 2011
+    m.loc[m.lgd_district_code.notna() & m.pc11_district_code.isna(), "match_type"] = "post2011_no_parent"
+
+    # Districts created after 2011: parent from the tehsil route (src/post2011_parents.py, D6c).
+    par = pd.read_csv(INTERIM / "post2011_parents.csv")
+    par = par.set_index("lgd_district_code")
+    need = m["match_type"] == "post2011_no_parent"
+    codes = m.loc[need, "lgd_district_code"].astype(int)
+    found = codes.isin(par.index)
+    idx = codes[found].index
+    m.loc[idx, "pc11_district_code"] = par.loc[codes[found], "pc11_parent_code"].values
+    m.loc[idx, "parent_share"] = par.loc[codes[found], "parent_share"].values
+    m.loc[idx, "parent_tie"] = par.loc[codes[found], "tie"].values
+    m.loc[idx, "match_type"] = ["post2011_" + t for t in par.loc[codes[found], "parent_type"]]
     out = INTERIM / "district_map.csv"
     m.to_csv(out, index=False)
     print(m.groupby(["source", "match_type"]).size().unstack(fill_value=0).to_string())
