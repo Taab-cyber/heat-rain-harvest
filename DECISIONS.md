@@ -63,3 +63,10 @@ All-crop APY long table = 406,612 rows (>= 50,000). Wheat + rice = 37,995 rows, 
 - **Alternatives:** use one season column only (would undercount in states using Winter/Summer rice).
 - **Why:** gives one comparable irrigated-area number per district-year without relabelling the portal's data. Irrigation share = irrigated area (LUS) / crop area (APY), computed after both are on 2011 districts.
 - Dropped 950 "Total of <State>" rows (state sums).
+
+## D6b. PC11 polygons downloaded from the original producer, not the AIKosh copy (2026-11-24)
+- **What happened:** AIKosh requires a registered login for every file (even the 10-byte .cpg), and the login could not be completed in the automated Chrome profile.
+- **Chosen:** the same dataset, "PC11 District Polygons" (SHRUG Open Polygons, Development Data Lab), from its publisher's public download page https://www.devdatalab.org/shrug_download/ (module "Open Polygons and Spatial Statistics", SHP). AIKosh's own dataset card names Development Data Lab as the source and calls the files "version 2.1 of the SHRUG"; DDL's page currently serves SHRUG 2.2.
+- **Not a change of dataset:** same producer, same Census 2011 district polygons, same licence (CC BY-NC-SA 4.0). Still no GADM or DataMeet as a direct source.
+- **For the paper:** source = Development Data Lab SHRUG Open Polygons (also hosted on AIKosh, GoI); cite Asher, Lunt, Matsuura & Novosad, "Development research at high geographic resolution: an analysis of night-lights, firms, and poverty in India using the SHRUG open data platform", World Bank Economic Review (the citation DDL asks for). The exact version used is recorded from the downloaded files.
+- **Check before use:** compare the district count and names with Census 2011 (640 districts) and with the AIKosh file list (district.shp/.dbf/.shx/.prj).
