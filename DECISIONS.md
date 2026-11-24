@@ -70,6 +70,13 @@ All-crop APY long table = 406,612 rows (>= 50,000). Wheat + rice = 37,995 rows, 
 - **Why:** gives one comparable irrigated-area number per district-year without relabelling the portal's data. Irrigation share = irrigated area (LUS) / crop area (APY), computed after both are on 2011 districts.
 - Dropped 950 "Total of <State>" rows (state sums).
 
+## D11. Implausible yields are flagged, not deleted (Phase 3, 2026-11-24)
+- **Observed:** e.g. Kolhapur rice 1997 = 224 t/ha, North/South Goa rice 2022 = 39-45 t/ha, Moga wheat 2008 = 7.46 t/ha. Real district-average yields are about 5-6 t/ha at most, so these are reporting/unit errors in the source.
+- **Chosen:** `yield_raw` keeps the computed value; `yield_flag` = True if yield > ceiling (wheat 7, rice 8 t/ha) or > 3x / < 1/3 of the unit's own median for that crop and season; `yield_clean` = yield with flagged values set to missing. Analyses use `yield_clean`.
+- **Result:** 12,247 of 383,580 yields flagged (3.2%); wheat 100 (0.8%), rice 433 (1.8%). Most flags are minor crops on tiny areas.
+- **Alternatives:** keep everything (errors would dominate regressions); delete rows (loses the record and changes counts); winsorise (still keeps impossible values).
+- **Sensitivity:** the 3x threshold is a judgement call; Phase 8 re-runs the main model with 2x and 4x.
+
 ## D6c. 2011 parents of post-2011 districts via sub-districts (2026-11-24)
 - **Problem:** LGD gives "Census 2011 Code = 0" for 152 districts created after 2011, and LGD's "Download Only Modifications" report (kept in data/raw/boundaries/) has no "carved from" column.
 - **Chosen:** tehsil route. LGD "All Sub-Districts of India" gives each current tehsil's current district and Census 2011 sub-district code; SHRUG PC11 sub-district file gives each 2011 sub-district's 2011 district. A new district's parent = the 2011 district that most of its tehsils came from (`src/post2011_parents.py`). Exact ties: lower PC11 code wins, flagged `parent_tie`.
