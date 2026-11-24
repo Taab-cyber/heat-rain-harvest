@@ -70,6 +70,21 @@ All-crop APY long table = 406,612 rows (>= 50,000). Wheat + rice = 37,995 rows, 
 - **Why:** gives one comparable irrigated-area number per district-year without relabelling the portal's data. Irrigation share = irrigated area (LUS) / crop area (APY), computed after both are on 2011 districts.
 - Dropped 950 "Total of <State>" rows (state sums).
 
+## D13. Crop-season windows and weather features (Phase 4, 2026-11-24)
+- **Wheat (rabi):** 1 Nov Y to 31 Mar Y+1. Ends on 31 March so the same window serves the pre-harvest forecast (weather only up to end of March). Alternative: Nov-Apr (more complete, but April is after the forecast cutoff and overlaps harvest).
+- **Rice (kharif):** 1 Jun to 31 Oct Y; dry spells counted Jun-Sep (core monsoon). Alternative: state-specific crop calendars (better, but no single official machine-readable calendar for all districts). Limitation: rice yield combines all seasons (rabi/summer rice in the east and south), while the weather window is kharif only.
+- **GDD:** daily mean T = (tmax+tmin)/2; GDD = sum max(0, min(T, T_upper) - T_base). Wheat base 0 C, cap 30 C; rice base 10 C, cap 35 C. Common choices in the crop literature; the simple mean-temperature method is used because only daily max/min exist.
+- **Extreme heat:** EDD = sum max(0, tmax - 34 C) for wheat (Lobell et al. 2012 used 34 C for Indian wheat), 35 C for rice; plus count of days with tmax > 35 C (wheat: March only, the grain-filling month).
+- **Rain:** season total; rainy days = rain >= 2.5 mm (IMD rainy-day definition); variability = coefficient of variation of monthly totals; longest dry spell = longest run of days < 2.5 mm.
+- **Missing data:** a season feature is missing if > 10% of its days lack data, or if the season is not fully covered by the data (e.g. Jan-Mar 1997 only).
+- **Tripura unit:** daily weather = area-weighted mean of its 2011 districts (areas in EPSG:6933).
+
+## D14. Analysis sample, detrending and the yield-loss event (Phase 4)
+- **Sample:** crop area >= 1,000 ha and a clean yield (`in_sample`). Wheat 9,793 unit-years (444 units), rice 13,052 (575). Tiny areas give very noisy yields. Alternative: weight by area (planned as robustness in Phase 8).
+- **Detrending:** linear trend per unit (captures technology/varieties). Two versions:
+  `trend_full` (all years; descriptive EDA and statistics only) and `detrend_train_only()` (fit on years <= 2017, extrapolated; used for every prediction task). A test (`tests/test_no_leakage.py`) proves the train-only trend ignores test years. Alternatives: quadratic trend or year fixed effects (used in the regressions).
+- **Yield loss:** relative anomaly < -10% (`yield_loss`). Share: wheat 21.9%, rice 23.3% of the sample. Threshold sensitivity (-5%, -15%) to be checked in Phase 8.
+
 ## D12. Crop irrigation share (Phase 3, 2026-11-24)
 - **Definition:** irr_share = crop-wise irrigated area (LUS) / crop area (APY), per unit-year. Seasons combined.
 - **Observed:** the two sources are collected separately, so the ratio can exceed 1. Wheat raw ratio median 0.98, 95th pct 1.16, 99th pct 10.0; rice median 0.78, 99th pct 1.48. Over-1.1 cases cluster in Odisha wheat (mostly < 2,000 ha) and Uttar Pradesh rice.
