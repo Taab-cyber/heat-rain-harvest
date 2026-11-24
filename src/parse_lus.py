@@ -65,6 +65,9 @@ def main() -> None:
     n_tot = df["state"].str.startswith("Total of").sum()
     df = df[~df["state"].str.startswith("Total of")].copy()     # state-sum rows, not districts
     print(f"dropped {n_tot:,} 'Total of <State>' rows")
+    is_tot = df["district"].str.contains(r"[ _]total$", case=False, regex=True)   # e.g. "Delhi_Total", "Goa Total"
+    print(f"dropped {int(is_tot.sum()):,} '<State> Total' district rows")
+    df = df[~is_tot].copy()
 
     # Derived crop-wise irrigated area (DECISIONS D10). The portal labels irrigated rice
     # by the traditional seasons Autumn/Winter/Summer (sometimes Kharif/Rabi) plus Total.

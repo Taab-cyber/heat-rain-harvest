@@ -45,7 +45,8 @@ def parse_file(path) -> pd.DataFrame:
     df = df.dropna(subset=["area_ha", "production"], how="all")
     for c in ("state", "district"):
         df[c] = df[c].astype(str).str.replace(NUM_PREFIX, "", regex=True).str.strip()
-    df = df[~df["district"].str.contains("_Total", case=False)]
+    # State-total rows appear as "Punjab_Total" and also as "Goa Total" (space): drop both.
+    df = df[~df["district"].str.contains(r"[ _]total$", case=False, regex=True)]
     df["year"] = df["year"].str.slice(0, 4).astype(int)   # "1997 - 1998" -> 1997
     return df
 
