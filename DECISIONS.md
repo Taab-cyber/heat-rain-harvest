@@ -70,6 +70,14 @@ All-crop APY long table = 406,612 rows (>= 50,000). Wheat + rice = 37,995 rows, 
 - **Why:** gives one comparable irrigated-area number per district-year without relabelling the portal's data. Irrigation share = irrigated area (LUS) / crop area (APY), computed after both are on 2011 districts.
 - Dropped 950 "Total of <State>" rows (state sums).
 
+## D16. Which inference to trust (Phase 6, 2026-11-24)
+- **Problem:** district-years are not independent (same district over years, same weather across neighbours), and anomalies are heavy-tailed (excess kurtosis about 23). Simple t/ANOVA/chi-square p-values are therefore too optimistic.
+- **Chosen as the main test:** OLS with district fixed effects + year fixed effects, standard errors clustered by district (statsmodels `cov_type="cluster"`), plus a cluster bootstrap (resample districts, 2,000 draws, seed 42) for key differences. Simple tests are shown for teaching and as consistency checks.
+- **Hot March definition for group tests:** >= 3 more days > 35 C than the district's own mean. Drought (rice): Jun-Sep rain >= 20% below the district's mean.
+- **Alternatives:** two-way clustering (district and year) or Conley spatial errors (better for spatially correlated weather; not used because it needs extra packages, so listed as a limitation); linearmodels PanelOLS (same estimates, not installed).
+- **Results recorded:** wheat night temp about -4.2% per +1 C (p < 0.001); +10 hot March days about -1.8% (p = 0.017); wheat heat x irrigation interaction +0.045 (p = 0.10; p = 0.045 without MP 2018+: suggestive only); rice monsoon deficit x irrigation -0.19 (p < 0.0001: irrigation buffers drought).
+- **Multiple testing:** for families of exploratory tests use Benjamini-Hochberg FDR; report Bonferroni/Holm alongside.
+
 ## D15. Madhya Pradesh area/production series break from 2018 (Phase 5, 2026-11-24)
 - **Observed:** MP wheat area in APY: 5.8 Mha (2017), 7.7 (2018), 10.2 (2019), about 9.5-9.8 after. District examples: Shivpuri 76,900 ha (2017) -> 311,478 ha (2019); Mandsaur 86,300 -> 238,130. Exactly one APY row per district-season, so this is in the source, not a processing double count. Production rose with area, so district **yields** stay in their usual range (Shivpuri 2.7-3.3, Rajgarh 2.9-3.5 t/ha).
 - **Interpretation:** a break in the reported area/production series (cause not determinable from the data: real expansion or a change in collection). Not assumed either way.
