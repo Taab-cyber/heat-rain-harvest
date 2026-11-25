@@ -144,9 +144,9 @@ with tab_home:
         f = go.Figure()
         f.add_bar(x=ca.year, y=ca.tmean_anom_vs_1951_80, marker_color=np.where(ca.tmean_anom_vs_1951_80 > 0, RED, BLUE),
                   name="each year", opacity=.55)
-        f.add_scatter(x=ca.year, y=sm, line=dict(color="#222", width=3), name="10-year average")
+        f.add_scatter(x=ca.year, y=sm, line=dict(color="#f39c12", width=4), name="10-year average")
         f.update_layout(title="① India is getting hotter<br><sup>Each bar is one year: red = hotter than the 1950s-70s, "
-                              "blue = cooler</sup>", height=360, yaxis_title="°C warmer than 1951-80", showlegend=False,
+                              "blue = cooler; orange line = 10-year average</sup>", height=360, yaxis_title="°C warmer than 1951-80", showlegend=False,
                         margin=dict(t=70, b=10))
         left.plotly_chart(f, width="stretch")
     if T["clim_winters"] is not None:
@@ -237,13 +237,13 @@ with tab_mine:
     f = go.Figure()
     f.add_bar(x=y.year.map(season), y=y.yield_t_ha * 10 / 2.471,
               marker_color=np.where(y.yield_rel_anom < -0.10, RED, GREEN), name="harvest")
-    f.add_scatter(x=y.year.map(season), y=y.trend_full * 10 / 2.471, line=dict(color="#555", dash="dash", width=2),
+    f.add_scatter(x=y.year.map(season), y=y.trend_full * 10 / 2.471, line=dict(color="#f39c12", dash="dash", width=3),
                   name="usual level")
     f.update_layout(height=380, xaxis_type="category", xaxis_tickangle=-60, yaxis_title="quintals per acre",
                     legend=dict(orientation="h", y=1.1), margin=dict(t=30, b=10))
     st.plotly_chart(f, width="stretch")
     st.caption("🟥 red = bad year (more than 10% below the usual level) · 🟩 green = normal or good year · "
-               "dashed line = the usual level, which rises over time as farming improves.")
+               "orange dashed line = the usual level, which rises over time as farming improves.")
 
     # plain-language reason for each bad year, from that season's weather vs this district's normal
     cl = T["climate"][(T["climate"].crop == crop) & (T["climate"].unit_id == uid)].set_index("year")
