@@ -46,15 +46,18 @@ T = load()
 D = T["districts"]
 
 # ------------------------------------------------------------------ sidebar
-st.sidebar.title("🌾 Crop-Climate Risk Atlas")
-st.sidebar.caption("Heat, Rain & Harvest: India, 1997-2022, Census 2011 districts")
-crop = st.sidebar.radio("Crop", ["Wheat", "Rice (monsoon)"], help="Rice (monsoon) = kharif/autumn/winter rice only")
-warm = st.sidebar.slider("Warming scenario (+X °C)", 0.5, 3.0, 2.0, 0.5,
-                         help="Added to every day's max and min temperature; rain unchanged; no adaptation")
+st.sidebar.title("🌾 Heat, Rain & Harvest")
+st.sidebar.markdown("How India's weather is changing, and what it does to our **wheat** and **rice**.")
+CROP_LABEL = {"Wheat": "🌾 Wheat (grows in winter)", "Rice (monsoon)": "🍚 Rice (grows in the monsoon)"}
+crop = st.sidebar.radio("1. Pick a crop", list(CROP_LABEL), format_func=CROP_LABEL.get)
 have = T["yields"][T["yields"].crop == crop].unit_id.unique()
 opts = D[D.unit_id.isin(have)].assign(label=lambda d: d.d_name + " (" + d.state + ")").sort_values("label")
 default = opts.index[opts.d_name.eq("Ludhiana")].tolist()
-pick = st.sidebar.selectbox("District", opts.label, index=opts.index.get_loc(default[0]) if default else 0)
+pick = st.sidebar.selectbox("2. Pick your district (type to search)", opts.label,
+                            index=opts.index.get_loc(default[0]) if default else 0)
+warm = st.sidebar.slider("3. What if India gets hotter by...", 0.5, 3.0, 2.0, 0.5, format="+%.1f °C",
+                         help="Every day made this much warmer; rain unchanged; farmers change nothing")
+st.sidebar.caption("Data: Government of India (Ministry of Agriculture, India Meteorological Department), 1997-2022.")
 uid = int(opts.loc[opts.label == pick, "unit_id"].iloc[0])
 
 # risk score: share of loss years (more than 10% below trend) in 1997-2017; wheat districts without data use propagated probability
@@ -69,23 +72,222 @@ if crop == "Wheat":
     layer_df["risk_score_src"] = np.where(layer_df.risk_score.notna(), "observed loss share", np.where(prop.notna(), "propagated (climate similarity)", None))
     layer_df["risk_score"] = layer_df.risk_score.fillna(prop)
 
-tab_map, tab_d, tab_loss, tab_clim, tab_about = st.tabs(
-    ["🗺️ Map", "📍 District", "📉 Loss years", "🌡️ Climate 1901-2025", "ℹ️ About & caveats"])
+tab_home, tab_mine, tab_map, tab_exp = st.tabs(["🏠 Start here", "📍 My district", "🗺️ India map", "🔬 For experts"])
+with tab_exp:
+    st.caption("Detailed charts and methods for students, researchers and examiners.")
+    tab_d, tab_loss, tab_clim, tab_about = st.tabs(
+        ["📊 District details", "📉 Loss years", "🌡️ Climate 1901-2025", "ℹ️ About & caveats"])
 season = lambda y: f"{int(y)}-{(int(y) + 1) % 100:02d}"      # agricultural year label, e.g. 2014 -> "2014-15"
 WX_LABEL = {"tmin_mean": "Night temperature", "tmax_mean": "Day temperature", "feb_tmax_mean": "February day temp.",
             "mar_tmax_mean": "March day temp.", "mar_hot_days_35": "March days >= 35 °C", "rain_total": "Season rain",
             "rain_nov_jan": "Nov-Jan rain", "prev_monsoon_rain": "Previous monsoon rain", "rain_jun_sep": "Jun-Sep rain",
             "longest_dry_spell": "Longest dry spell", "rainy_days": "Rainy days", "hot_days_35": "Days >= 35 °C"}
 
+# ------------------------------------------------------------------ plain-language helpers
+st.markdown("""<style>
+.card {border-radius: 14px; padding: 18px 18px 14px; background: rgba(127,127,127,.10); height: 100%;}
+.card .big {font-size: 2.3rem; font-weight: 800; line-height: 1.1; margin: 4px 0 6px;}
+.card .emo {font-size: 2rem;}
+.card .txt {font-size: 1.02rem; line-height: 1.35;}
+.pill {display:inline-block; padding: 4px 14px; border-radius: 999px; font-weight: 700; font-size: 1.1rem; color: #fff;}
+.lead {font-size: 1.15rem; line-height: 1.5;}
+</style>""", unsafe_allow_html=True)
+
+
+def card(col, emoji, big, text, color="inherit"):
+    col.markdown(f'<div class="card"><div class="emo">{emoji}</div><div class="big" style="color:{color}">{big}</div>'
+                 f'<div class="txt">{text}</div></div>', unsafe_allow_html=True)
+
+
+CROP_WORD = {"Wheat": "wheat", "Rice (monsoon)": "rice"}[crop]
+RED, AMBER, GREEN, BLUE = "#d64545", "#e0a100", "#2e9e5b", "#3b7dd8"
+
+
+def national_change(c: str, dc: float) -> float:
+    s = T["scenarios"][(T["scenarios"].crop == c) & (T["scenarios"].delta_c == dc)].set_index("unit_id").delta_rel_yield
+    a = T["yields"][T["yields"].crop == c].groupby("unit_id").area_ha.mean().reindex(s.index)
+    ok = a.notna() & s.notna()
+    return float(np.average(s[ok], weights=a[ok]))
+
+
+def risk_level(share: float):
+    if pd.isna(share):
+        return "Not enough data", "#888"
+    if share < 0.15:
+        return "LOW", GREEN
+    return ("MEDIUM", AMBER) if share < 0.30 else ("HIGH", RED)
+
+
+# ------------------------------------------------------------------ start here
+with tab_home:
+    st.title("Is a hotter India hurting our food?")
+    st.markdown('<p class="lead">We looked at <b>26 years of harvests</b> in <b>every district of India</b> and '
+                '<b>125 years of weather</b>, using only Government of India data. Here is what we found, in five numbers.</p>',
+                unsafe_allow_html=True)
+    warming = float(T["clim_trends"].query("period == 'annual' and variable == 'tmean'").sen_per_decade.iloc[0] * 7.4) \
+        if T["clim_trends"] is not None else 0.56
+    w2, r2 = national_change("Wheat", warm), national_change("Rice (monsoon)", warm)
+    c1, c2, c3, c4, c5 = st.columns(5)
+    card(c1, "🌡️", f"+{warming:.1f} °C", "India is <b>warmer</b> than in the 1950s. October and November warmed the most.", RED)
+    card(c2, "❄️", "10 fewer", "<b>cold days</b> every winter than our grandparents had (about 89 then, 79 now).", BLUE)
+    card(c3, "🌙", "−5%", "<b>wheat</b> for every 1 °C warmer winter night. Wheat needs cool nights to fill its grains.", RED)
+    card(c4, "🌧️", "2 in 3", "rice harvests in <b>central India</b> fail when the monsoon rain fails (normally 1 in 3).", AMBER)
+    pct = lambda v: f"{v*100:+.0f}%".replace("-", "−")
+    card(c5, "🔮", pct(w2), f"wheat (and {pct(r2)} rice) if India gets <b>{warm:+.1f} °C</b> hotter and farmers "
+         "change nothing. Move the slider on the left to try other numbers.", RED)
+
+    st.markdown("### The story in four pictures")
+    left, right = st.columns(2)
+    if T["clim_annual"] is not None:
+        ca = T["clim_annual"]
+        sm = ca.tmean_anom_vs_1951_80.rolling(10, center=True, min_periods=5).mean()
+        f = go.Figure()
+        f.add_bar(x=ca.year, y=ca.tmean_anom_vs_1951_80, marker_color=np.where(ca.tmean_anom_vs_1951_80 > 0, RED, BLUE),
+                  name="each year", opacity=.55)
+        f.add_scatter(x=ca.year, y=sm, line=dict(color="#222", width=3), name="10-year average")
+        f.update_layout(title="① India is getting hotter<br><sup>Each bar is one year: red = hotter than the 1950s-70s, "
+                              "blue = cooler</sup>", height=360, yaxis_title="°C warmer than 1951-80", showlegend=False,
+                        margin=dict(t=70, b=10))
+        left.plotly_chart(f, width="stretch")
+    if T["clim_winters"] is not None:
+        w = T["clim_winters"]
+        f = go.Figure()
+        f.add_scatter(x=w.season, y=w.cool_days.rolling(10, center=True, min_periods=5).mean(), fill="tozeroy",
+                      line=dict(color=BLUE, width=3), name="cold days")
+        f.update_layout(title="② Winters are getting shorter<br><sup>Number of cold days in a winter (10-year average)</sup>",
+                        height=360, yaxis_title="cold days per winter", yaxis_range=[60, 100], margin=dict(t=70, b=10))
+        right.plotly_chart(f, width="stretch")
+
+    left, right = st.columns(2)
+    if T["loss_by_year"] is not None:
+        ly = T["loss_by_year"][T["loss_by_year"].crop == crop].copy()
+        ly["season"] = ly.year.map(season)
+        why = ({2014: "rain & hail at harvest", 2015: "warm, dry winter", 2005: "very hot February"} if crop == "Wheat"
+               else {2002: "monsoon failed", 2015: "monsoon failed", 2009: "monsoon failed"})
+        f = go.Figure()
+        f.add_bar(x=ly.season, y=ly.share_area_in_loss * 100,
+                  marker_color=np.where(ly.share_area_in_loss > .3, RED, "#b9b9b9"))
+        for yr, txt in why.items():
+            r = ly[ly.year == yr]
+            if len(r):
+                f.add_annotation(x=r.season.iloc[0], y=float(r.share_area_in_loss.iloc[0] * 100), text=txt,
+                                 showarrow=True, arrowhead=0, ay=-30, font=dict(size=12))
+        f.update_layout(title=f"③ Bad years for {CROP_WORD}<br><sup>% of India's {CROP_WORD} fields that gave a much smaller "
+                              "harvest than usual (more than 10% less)</sup>", height=380, xaxis_type="category",
+                        xaxis_tickangle=-60, yaxis_title="% of fields", margin=dict(t=70, b=10))
+        left.plotly_chart(f, width="stretch")
+    sc = pd.DataFrame({"crop": ["🌾 Wheat", "🍚 Rice"], "change": [w2 * 100, r2 * 100]})
+    f = px.bar(sc, x="crop", y="change", text=sc.change.map(lambda v: f"{v:+.0f}%"), color_discrete_sequence=[RED])
+    f.update_traces(textposition="outside", textfont_size=20)
+    f.update_layout(title=f"④ If India gets {warm:+.1f} °C hotter<br><sup>Change in harvest if farmers change nothing "
+                          "(move the slider on the left)</sup>", height=380, yaxis_title="% change in harvest",
+                    yaxis_range=[min(-25, sc.change.min() * 1.4), 5], xaxis_title="", margin=dict(t=70, b=10))
+    right.plotly_chart(f, width="stretch")
+
+    st.markdown("### What does this mean?")
+    st.markdown("""
+- 🌙 **Warm nights are the hidden danger for wheat.** Hot days get the headlines, but wheat suffers most when winter
+  *nights* stay warm.
+- 💧 **Water protects rice, not wheat.** Irrigated districts barely lose rice in a drought. But water cannot cool a wheat
+  plant in a heatwave, so even well-watered Punjab lost wheat in the March 2022 heatwave.
+- 🧑‍🌾 **Farmers have kept up so far.** Harvests still grew over these 26 years thanks to better seeds and irrigation.
+  The question is whether they can keep up if warming speeds up.
+""")
+    st.info("👉 **Next:** open **📍 My district** (top of the page) to see your own district, or **🗺️ India map** to compare districts.")
+    st.caption("These are patterns from real data, not exact predictions. Weather is only one reason harvests go up and "
+               "down; seeds, pests, prices and farming methods matter too. Details and methods: 🔬 For experts.")
+
+# ------------------------------------------------------------------ my district (plain language)
+with tab_mine:
+    info = layer_df.loc[uid]
+    y = y_all[y_all.unit_id == uid].sort_values("year")
+    valid = y.dropna(subset=["yield_rel_anom"])
+    n, bad = len(valid), int((valid.yield_rel_anom < -0.10).sum())
+    level, lcol = risk_level(bad / n if n else np.nan)
+    st.title(f"📍 {info.d_name}, {info.state}")
+    st.markdown(f'<p class="lead">{CROP_LABEL[crop]} &nbsp; Risk of a bad harvest: '
+                f'<span class="pill" style="background:{lcol}">{level}</span></p>', unsafe_allow_html=True)
+
+    qpa = info.mean_yield * 10 / 2.471 if pd.notna(info.mean_yield) else np.nan      # t/ha -> quintals per acre
+    irr = float(np.clip(y.irr_share.mean(), 0, 1)) if y.irr_share.notna().any() else np.nan
+    c1, c2, c3, c4 = st.columns(4)
+    card(c1, "📉", f"{bad} of {n}", f"years had a <b>bad harvest</b> here (much smaller than usual).", lcol)
+    card(c2, "🌾" if crop == "Wheat" else "🍚", f"{qpa:.0f} quintals" if pd.notna(qpa) else "n/a",
+         f"per acre is a <b>typical harvest</b> here ({info.mean_yield:.1f} tonnes per hectare).")
+    card(c3, "💧", f"{irr*10:.0f} in 10" if pd.notna(irr) else "n/a",
+         f"{CROP_WORD} fields here get <b>irrigation</b> water (not just rain).", BLUE)
+    if pd.notna(info.scenario):
+        word = "less" if info.scenario < 0 else "more"
+        card(c4, "🔮", f"{abs(info.scenario)*100:.0f}% {word}",
+             f"{CROP_WORD} if it gets <b>{warm:+.1f} °C</b> hotter here"
+             + (f" (about {abs(info.scenario)*qpa:.1f} quintals per acre)." if pd.notna(qpa) else "."),
+             RED if info.scenario < 0 else GREEN)
+    else:
+        card(c4, "🔮", "n/a", "No warming estimate for this district.")
+
+    dtr = T["clim_district_trends"]
+    if dtr is not None and (dtr.unit_id == uid).any():
+        r = dtr[dtr.unit_id == uid].iloc[0]
+        nights = r.tmin_per_decade * 7.4
+        st.markdown(f"🌡️ **Since 1951, nights in {info.d_name} have become {abs(nights):.1f} °C "
+                    f"{'warmer' if nights >= 0 else 'cooler'}** and days {abs(r.tmax_per_decade*7.4):.1f} °C "
+                    f"{'warmer' if r.tmax_per_decade >= 0 else 'cooler'}.")
+
+    st.markdown(f"### Every {CROP_WORD} harvest in {info.d_name}")
+    f = go.Figure()
+    f.add_bar(x=y.year.map(season), y=y.yield_t_ha * 10 / 2.471,
+              marker_color=np.where(y.yield_rel_anom < -0.10, RED, GREEN), name="harvest")
+    f.add_scatter(x=y.year.map(season), y=y.trend_full * 10 / 2.471, line=dict(color="#555", dash="dash", width=2),
+                  name="usual level")
+    f.update_layout(height=380, xaxis_type="category", xaxis_tickangle=-60, yaxis_title="quintals per acre",
+                    legend=dict(orientation="h", y=1.1), margin=dict(t=30, b=10))
+    st.plotly_chart(f, width="stretch")
+    st.caption("🟥 red = bad year (more than 10% below the usual level) · 🟩 green = normal or good year · "
+               "dashed line = the usual level, which rises over time as farming improves.")
+
+    # plain-language reason for each bad year, from that season's weather vs this district's normal
+    cl = T["climate"][(T["climate"].crop == crop) & (T["climate"].unit_id == uid)].set_index("year")
+    if crop == "Wheat":
+        rules = [("tmin_mean", 1, "winter nights were unusually warm 🌙"), ("mar_tmax_mean", 1, "March was unusually hot ☀️"),
+                 ("rain_total", 1, "it was an unusually wet season (rain or hail) 🌧️"),
+                 ("rain_total", -1, "it was an unusually dry winter 🏜️")]
+    else:
+        rules = [("rain_jun_sep", -1, "the monsoon rain was far below normal 🏜️"),
+                 ("longest_dry_spell", 1, "there was a long dry spell in the monsoon ☀️"),
+                 ("rain_jun_sep", 1, "the monsoon was unusually heavy (possible floods) 🌊"),
+                 ("tmax_mean", 1, "days were unusually hot ☀️")]
+    z = {v: (cl[v] - cl[v].mean()) / cl[v].std() for v, _, _ in rules if v in cl}
+    lines = []
+    for _, r in valid[valid.yield_rel_anom < -0.10].iterrows():
+        why = [txt for v, s, txt in rules if v in z and r.year in z[v].index and pd.notna(z[v][r.year])
+               and ((s > 0 and z[v][r.year] > 0.8) or (s < 0 and z[v][r.year] < -0.8))]
+        reason = (", ".join(why[:-1]) + " and " + why[-1] if len(why) > 1 else why[0]) if why else "the weather looked normal, so something else (pests, floods, seeds, " \
+                                                 "markets, reporting) was probably the cause ❓"
+        lines.append(f"- **{season(r.year)}:** harvest {abs(r.yield_rel_anom)*100:.0f}% below usual — {reason}.")
+    if lines:
+        st.markdown(f"### What happened in the bad years?")
+        st.markdown("\n".join(lines))
+        st.caption("Compared with this district's own normal weather. These are clues, not proof.")
+    else:
+        st.success(f"No bad {CROP_WORD} years in {info.d_name} in this period. 🎉")
+    st.info("👉 Try another district in the left panel, or switch crop. Detailed charts are under 🔬 For experts.")
+
 # ------------------------------------------------------------------ map
 with tab_map:
-    layers = {f"Yield change at +{warm:g} °C (% of trend)": ("scenario", 100, "RdBu", True),
-              "Risk score (share of loss years 1997-2017)": ("risk_score", 100, "Reds", False),
-              "Heat sensitivity (% yield per +1 °C)": ("heat_effect_per_c", 100, "RdBu", True),
-              "Mean yield (t/ha)": ("mean_yield", 1, "YlGn", False)}
+    st.markdown(f"### {CROP_LABEL[crop]} across India")
+    layers = {"⚠️ How often harvests failed (% of years)": ("risk_score", 100, "Reds", False),
+              f"🔮 Harvest change if {warm:+.1f} °C hotter (%)": ("scenario", 100, "RdBu", True),
+              "🌡️ How much 1 °C of heat hurts (% per °C)": ("heat_effect_per_c", 100, "RdBu", True),
+              "🌾 Typical harvest (tonnes per hectare)": ("mean_yield", 1, "YlGn", False)}
     if crop == "Wheat":
-        layers["Risk zone (k-means, 1997-2017)"] = ("zone", None, None, False)
-    choice = st.selectbox("Map layer", list(layers))
+        layers["🧩 Risk zones (districts grouped by climate)"] = ("zone", None, None, False)
+    choice = st.selectbox("What do you want to see?", list(layers))
+    st.caption({"risk_score": "Darker red = bad harvests happen more often there.",
+                "scenario": "Red = harvest goes down, blue = goes up. Darker = bigger change.",
+                "heat_effect_per_c": "Red = heat hurts the harvest more there.",
+                "mean_yield": "Darker green = bigger harvests.",
+                "zone": "Districts with similar climate risk share a colour."}[layers[choice][0]]
+               + " Grey = no data or the crop is not grown. Hover over a district to see its name.")
     col, scale, cmap, diverging = layers[choice]
     m = layer_df.reset_index()[["unit_id", "d_name", "state", col]].dropna(subset=[col])
     if scale is None:
