@@ -1,5 +1,7 @@
 # Deploying the Crop-Climate Risk Atlas (free, Streamlit Community Cloud)
 
+**Live app:** https://crop-climate-risk-atlas.streamlit.app (repository https://github.com/Taab-cyber/heat-rain-harvest, deployed 2026-11-25).
+
 The atlas is a pure-Python dashboard (pandas + Plotly + Streamlit) and replaces Tableau for the interactive part.
 The static analysis figures come from seaborn/matplotlib in the notebooks (`reports/figures/`).
 Ask the professor once whether a Python dashboard is acceptable in place of Tableau; the Tableau exports in

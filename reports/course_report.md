@@ -95,7 +95,7 @@ accounts (docs/MANUAL_DOWNLOADS.md, section D).
 ## 5. Application
 **Crop-Climate Risk Atlas** (`streamlit run app/app.py`): pick crop and district; see the yield trend, anomalies and loss
 years, the weather trend, heat sensitivity, risk score and zone, a +X C warming slider (0.5-3 C), and the 2018-22
-forecasts against actual yields. A "Climate 1901-2025" tab shows the long-run warming, winters, monsoon and harvest link. Data are served from `app/atlas.sqlite`. A Tableau Public dashboard can be built from
+forecasts against actual yields. Live at https://crop-climate-risk-atlas.streamlit.app. A "Climate 1901-2025" tab shows the long-run warming, winters, monsoon and harvest link. Data are served from `app/atlas.sqlite`. A Tableau Public dashboard can be built from
 `reports/tableau/` following `reports/tableau/TABLEAU.md`.
 
 ## 6. Limitations

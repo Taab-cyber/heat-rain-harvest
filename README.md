@@ -84,7 +84,7 @@ Figures are saved to `reports/figures/`.
 ## 5. The app
 ```bash
 streamlit run app/app.py             # then open http://localhost:8501
-# Public deployment (Streamlit Community Cloud): see docs/DEPLOY.md
+# Live: https://crop-climate-risk-atlas.streamlit.app  (deployment steps: docs/DEPLOY.md)
 ```
 
 ## 6. The paper
