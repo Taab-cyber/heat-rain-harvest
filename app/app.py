@@ -93,7 +93,7 @@ with tab_map:
                             hover_name="d_name", hover_data={"state": True, "unit_id": False, "value": ":.2f"})
     fig.update_geos(fitbounds="locations", visible=False)
     fig.update_layout(height=650, margin=dict(l=0, r=0, t=10, b=0))
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
     if col == "scenario":
         w = layer_df.dropna(subset=["scenario", "mean_yield"])
         area = y_all.groupby("unit_id").area_ha.mean().reindex(w.index)
@@ -123,7 +123,7 @@ with tab_d:
         fig.add_bar(x=y.year, y=y.yield_t_ha, name="yield", marker_color="#d9a441")
         fig.add_scatter(x=y.year, y=y.trend_full, name="trend", line=dict(color="black", dash="dash"))
         fig.update_layout(title="Yield and long-run trend (t/ha)", height=330, margin=dict(t=40, b=10))
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
     with right:
         c = T["climate"][(T["climate"].crop == crop) & (T["climate"].unit_id == uid)].sort_values("year")
         var = "mar_tmax_mean" if crop == "Wheat" else "rain_jun_sep"
@@ -133,7 +133,7 @@ with tab_d:
             z = np.polyfit(c.year[c[var].notna()], c[var].dropna(), 1)
             fig.add_scatter(x=c.year, y=np.polyval(z, c.year), name="linear trend", line=dict(dash="dot"))
             fig.update_layout(height=330, margin=dict(t=40, b=10), showlegend=False)
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
 
     left, right = st.columns(2)
     with left:
@@ -141,14 +141,14 @@ with tab_d:
         fig = px.bar(a, x="year", y=a.yield_rel_anom * 100, color=a.yield_rel_anom < -0.10,
                      color_discrete_map={True: "#c0392b", False: "#7f8c8d"}, title="Yield vs trend (%); red = loss year")
         fig.update_layout(height=300, showlegend=False, yaxis_title="%", margin=dict(t=40, b=10))
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
     with right:
         s = T["scenarios"][(T["scenarios"].crop == crop) & (T["scenarios"].unit_id == uid)]
         if len(s):
             fig = px.line(s, x="delta_c", y=s.delta_rel_yield * 100, markers=True, title="Modelled yield change vs warming (%)")
             fig.add_vline(x=warm, line_dash="dash")
             fig.update_layout(height=300, xaxis_title="+°C", yaxis_title="% of trend", margin=dict(t=40, b=10))
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
 
     f = T["forecasts"][(T["forecasts"].crop == crop) & (T["forecasts"].unit_id == uid)]
     if len(f):
@@ -156,7 +156,7 @@ with tab_d:
         show = f.assign(season=f.year.astype(str) + "-" + (f.year + 1 - 2000).astype(str).str.zfill(2))[
             ["season", "actual", "trend_train", "pred_ridge"]].rename(columns={
             "actual": "actual (t/ha)", "trend_train": "trend-only forecast", "pred_ridge": "weather model (Ridge)"})
-        st.dataframe(show.round(2), hide_index=True, use_container_width=True)
+        st.dataframe(show.round(2), hide_index=True, width="stretch")
         st.caption("Out of sample, the weather model is only marginally better than the trend for wheat (+1.8% skill) and "
                    "not better for rice. It did not anticipate the 2021-22 Punjab-Haryana heat losses.")
 
@@ -179,7 +179,7 @@ with tab_clim:
             f.add_scatter(x=ca.year, y=s, name=v, line=dict(color=col, width=1), opacity=.45)
             f.add_scatter(x=ca.year, y=s.rolling(10, center=True).mean(), name=f"{v} 10-yr mean", line=dict(color=col, width=3))
         f.update_layout(title="All-India temperature anomaly vs 1951-1980 (°C)", height=380, margin=dict(t=40, b=10))
-        st.plotly_chart(f, use_container_width=True)
+        st.plotly_chart(f, width="stretch")
 
         months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
         mt = ct[(ct.variable == "tmean") & ct.period.isin(months)].set_index("period").loc[months].reset_index()
@@ -188,13 +188,13 @@ with tab_clim:
         left.plotly_chart(px.bar(mt, x="period", y="sen_per_decade", color="significant (5%)",
                                  color_discrete_map={"yes": "#d62728", "no": "#bbb"},
                                  labels={"period": "", "sen_per_decade": "°C per decade"},
-                                 title="Warming by month, 1951-2025").update_layout(height=330), use_container_width=True)
+                                 title="Warming by month, 1951-2025").update_layout(height=330), width="stretch")
         w = T["clim_winters"]
         fw = go.Figure()
         fw.add_scatter(x=w.season, y=w.cool_days, name="cool days", line=dict(width=1))
         fw.add_scatter(x=w.season, y=w.cool_days.rolling(10, center=True).mean(), name="10-yr mean", line=dict(width=3))
         fw.update_layout(title="Cool days per winter (Oct-Mar, colder than the coolest quarter of the year in 1951-80)", height=330)
-        right.plotly_chart(fw, use_container_width=True)
+        right.plotly_chart(fw, width="stretch")
 
         dtr = T["clim_district_trends"]
         if dtr is not None:
@@ -203,7 +203,7 @@ with tab_clim:
                                range_color=(-.25, .25), hover_name="d_name", labels={"tmin_per_decade": "°C / decade"},
                                title="Night-time (tmin) warming by district, 1951-2025")
             fm.update_geos(fitbounds="locations", visible=False).update_layout(height=520, margin=dict(t=40, b=0))
-            st.plotly_chart(fm, use_container_width=True)
+            st.plotly_chart(fm, width="stretch")
             r = dtr[dtr.unit_id == uid]
             if len(r):
                 st.write(f"**{pick}**: day-time {r.tmax_per_decade.iloc[0]:+.2f} °C/decade, "
@@ -215,13 +215,13 @@ with tab_clim:
             fmn.add_bar(x=mn.year, y=mn.jjas_mm, name="June-September rain (mm)", marker_color="#6baed6")
             fmn.add_scatter(x=mn.year, y=mn.jjas_mm.rolling(10, center=True).mean(), name="10-yr mean", line=dict(color="#08519c", width=3))
             fmn.update_layout(title="All-India monsoon rainfall, 1901-2025 (district-area weighted)", height=340, yaxis_range=[600, 1100])
-            st.plotly_chart(fmn, use_container_width=True)
+            st.plotly_chart(fmn, width="stretch")
             mtr = T["monsoon_trends"]
             st.dataframe(mtr[mtr.period == "1951-2025"][["variable", "sen_per_decade", "mk_p"]].round(4),
-                         hide_index=True, use_container_width=True)
+                         hide_index=True, width="stretch")
         if T["harvest_link"] is not None:
             st.markdown("#### What the warming already means for harvests")
-            st.dataframe(T["harvest_link"].round(3), hide_index=True, use_container_width=True)
+            st.dataframe(T["harvest_link"].round(3), hide_index=True, width="stretch")
             st.caption("Season night warming (1996-2025 vs 1951-80) x the Phase 8 night-heat coefficient. Back-of-envelope: "
                        "assumes today's sensitivity held earlier; ignores adaptation, new varieties and CO2.")
 

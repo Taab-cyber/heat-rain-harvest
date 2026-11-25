@@ -25,7 +25,10 @@ deficits (interaction $p<0.0001$), whereas evidence that irrigation protects whe
 variation: on held-out years 2018--2022 the best model improves on a trend-only baseline by 1.8\% (wheat) and no model
 improves for rice, and a pre-harvest forecast missed the 2022 heatwave losses in Punjab and Haryana. Under uniform
 warming without adaptation, a fixed-effects model implies wheat yield changes of $-5.7\%$ [$-6.6$, $-4.8$] at
-\SI{+1}{\degreeCelsius} and $-11.3\%$ [$-13.2$, $-9.4$] at \SI{+2}{\degreeCelsius}. We release the pipeline and an
+\SI{+1}{\degreeCelsius} and $-11.3\%$ [$-13.2$, $-9.4$] at \SI{+2}{\degreeCelsius}. Extending IMD data back to 1951
+(temperature) and 1901 (rainfall), India has warmed by \SI{0.075}{\degreeCelsius} per decade, winters have about 10
+fewer cool days, and heavy-rain days have increased while total monsoon rainfall shows no trend; the wheat-season night
+warming observed so far implies wheat yields about 3.4\% lower than in a 1951--80 climate. We release the pipeline and an
 interactive Crop-Climate Risk Atlas.
 \end{abstract}
 
@@ -57,7 +60,9 @@ irrigated area; irrigation share = irrigated area / crop area.
 
 \textbf{Weather.} IMD gridded daily rainfall at \ang{0.25} \cite{pai2014} and maximum/minimum temperature at
 \ang{1.0} \cite{srivastava2009}, 1997--2023, aggregated to districts by area-weighted averaging of grid-cell/district
-intersections in an equal-area projection.
+intersections in an equal-area projection. For the long-run analysis (Section~\ref{sec:longrun}) the same grids were
+extended to 1951--2025 (temperature) and 1901--2025 (rainfall, all 125 files size-checked) and aggregated the same way;
+the crop models use only 1997--2023.
 
 \textbf{Boundaries.} Census 2011 district polygons from the SHRUG Open Polygons (Development Data Lab, version 2.2;
 also hosted on the Government of India AIKosh portal) \cite{asher2021}; 640 districts.
@@ -108,6 +113,16 @@ training years only.
 We add \SI{1}{\degreeCelsius} or \SI{2}{\degreeCelsius} to every daily maximum and minimum temperature, recompute
 all features, and apply the fixed-effects model to the 2018--22 seasons. Uncertainty: cluster bootstrap over districts
 (300 resamples, model refitted each time).
+
+\subsection{Long-run climate trends}
+All-India series are district-area-weighted means. Trends are Sen's slope per decade with the Mann--Kendall test
+\cite{sen1968}, against a 1951--1980 normal. A cool day is an October--March day whose 7-day mean temperature is below
+the district's own 1951--80 25th percentile; a cold night is a December--February minimum below the district's
+1951--80 10th percentile; monsoon rain-day classes use IMD thresholds (heavy \SI{64.5}{mm}, very heavy
+\SI{115.6}{mm}, extremely heavy \SI{204.5}{mm}). The yield effect of past warming is the change in season-mean night
+temperature between the 1951--80 and 1996--2025 normals multiplied by the fixed-effects night-temperature coefficient.
+We also test non-weather predictors available without portal accounts: last season's yield anomaly (known before
+sowing) and the training-period tubewell share of irrigation, chosen by year-grouped cross-validation on 1997--2017.
 
 \section{Results}
 \subsection{Heat, rain and irrigation}
@@ -164,6 +179,47 @@ and our rice estimate ($-4.4\%$) somewhat larger than the global $-3.2\%$ report
 Less-irrigated districts show larger modelled losses (wheat at \SI{+2}{\degreeCelsius}: $-29\%$ below 50\% irrigation
 vs $-9\%$ above 90\%), but these are mostly hill districts, so irrigation and location are confounded.
 
+\subsection{Long-run climate, 1901--2025}\label{sec:longrun}
+Table~\ref{tab:longrun} summarises the trends. India's mean temperature rose by \SI{0.075}{\degreeCelsius} per decade
+(about \SI{0.56}{\degreeCelsius} since 1951), fastest after the monsoon; May and June show no clear trend
+(Fig.~\ref{fig:anom}). The five hottest years were 2009, 2010, 2016, 2024 and 2017. Winters lost about ten cool
+days. Total monsoon rainfall has no trend over 125 years, but heavy, very heavy and extreme rain days have increased.
+We do not extrapolate these trends; projections are the domain of climate models \cite{krishnan2020}.
+
+\begin{table}[t]
+\centering
+\caption{Long-run all-India trends (Sen slope per decade, Mann--Kendall $p$)}
+\label{tab:longrun}
+\begin{tabular}{lrr}
+\toprule
+Measure & Change & $p$ \\
+\midrule
+Mean temperature 1951--2025 (\si{\degreeCelsius}) & $+0.075$ & $<0.001$ \\
+Oct--Nov mean temperature (\si{\degreeCelsius}) & $+0.136$ & $<0.001$ \\
+Cool days per winter & $-2.1$ & $<0.001$ \\
+Cold nights per winter & $-0.3$ & $0.14$ \\
+March days $\ge$\SI{35}{\degreeCelsius} & $+0.4$ & $0.046$ \\
+June--Sept.\ rain 1901--2025 (mm) & $+0.9$ & $0.65$ \\
+Heavy-rain days ($\ge$\SI{64.5}{mm}) & $+0.013$ & $0.005$ \\
+Longest June--Sept.\ dry spell (days) & $-0.17$ & $0.013$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\columnwidth]{09_india_temperature_anomaly.png}
+\caption{All-India temperature anomaly relative to 1951--1980 (IMD gridded data, district-area weighted); thick lines
+are 10-year means.}
+\label{fig:anom}
+\end{figure}
+
+Wheat-season (November--March) nights warmed by \SI{0.64}{\degreeCelsius} between the two normals, which implies wheat
+yields about 3.4\% lower (95\% CI 2.5--4.2\%) than in a 1951--80 climate, all else equal; for monsoon rice the implied
+effect is $-0.3\%$ [$-0.7$, $+0.05$]. Among non-weather predictors, last season's yield anomaly raised wheat
+cross-validated skill from 2.4\% to 7.3\% (test 2018--22: $-6.3\%$ to $+18.5\%$, partly by correcting trend drift),
+while the tubewell share added nothing.
+
 \section{Discussion}
 Heat effects are real and robust, yet small relative to all other sources of year-to-year variation (yield anomalies
 have a standard deviation of about 19\%), so statistical significance does not translate into forecast skill.
@@ -180,13 +236,16 @@ is consistent with the high heat sensitivity of the irrigated Madhya Pradesh--Bi
 \item \textbf{Identification:} fixed effects remove stable district differences and common year shocks, but time-varying confounders (e.g.\ input use, pests) remain; irrigation is not randomly assigned.
 \item \textbf{Prediction:} test period is five years; trend extrapolation error dominates; a few test-set comparisons were made before features were selected by training-year CV (disclosed).
 \item \textbf{Scenarios:} uniform warming, unchanged rainfall, no adaptation, linear model; \SI{+2}{\degreeCelsius} extrapolates beyond observed variation.
+\item \textbf{Long-run trends:} Mann--Kendall $p$-values ignore serial correlation and are slightly optimistic; the yield effect of past warming assumes the 1997--2022 sensitivity held earlier and ignores adaptation and CO$_2$.
 \end{itemize}
 
 \section{Conclusion}
 Using only official data harmonised to fixed districts, we find robust negative effects of warmer nights on Indian
 wheat yields and strong irrigation buffering of rice against monsoon deficits, but very limited out-of-sample
 predictability of yields from weather alone. Policy-relevant risk maps should therefore combine historical risk with
-climate sensitivity rather than rely on seasonal weather forecasts alone.
+climate sensitivity rather than rely on seasonal weather forecasts alone. The warming already observed since 1951,
+concentrated in the post-monsoon and winter months, has likely cost wheat a few percent of yield, a drag that
+technology has so far more than offset.
 
 \section*{Data and code availability}
 All code, decisions and the Crop-Climate Risk Atlas are in the project repository; raw data are downloadable from the

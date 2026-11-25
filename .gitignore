@@ -8,9 +8,9 @@ __pycache__/
 .env
 *.nc
 
-# derived app data (rebuild: python -m src.build_db)
-app/atlas.sqlite
-app/districts.geojson
+# derived app data (rebuild: python -m src.build_db) - committed so the deployed app can read them
+# app/atlas.sqlite
+# app/districts.geojson
 # derived Tableau exports (rebuild: python -m src.export_tableau)
 reports/tableau/*.csv
 reports/tableau/*.geojson
