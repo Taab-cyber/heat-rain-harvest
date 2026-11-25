@@ -36,11 +36,13 @@ if [[ "${1:-}" != "--skip-longrun" ]]; then
   python -m src.harvest_factors
 fi
 
+python -m src.loss_patterns
+
 step "Phase 9: app database, Tableau exports, notebooks"
 python -m src.build_db
 python -m src.export_tableau
 for b in notebooks/builders/make_*.py; do python "$b"; done
-for nb in notebooks/0[5-9]_*.ipynb; do
+for nb in notebooks/0[5-9]_*.ipynb notebooks/10_*.ipynb; do
   jupyter nbconvert --to notebook --execute --inplace "$nb"
 done
 

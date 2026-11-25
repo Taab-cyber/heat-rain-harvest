@@ -41,6 +41,7 @@ district-years), and we state this openly (DECISIONS D3).
 | 8 Prediction | trend baseline, FE, Ridge, RF, GBM, loss classifier, pre-harvest forecast, scenarios | `src/models.py`, `src/run_phase8.py`, `notebooks/08_models.ipynb` |
 | 9 Application | SQLite + Streamlit Risk Atlas, Tableau exports, report, paper | `app/`, `src/build_db.py`, `reports/` |
 | 10 Long-run climate (extension) | warming 1951-2025 by year/season/month/week/day, winters, hot days, monsoon 1901-2025, harvest link, non-weather factors | `src/climate_trends.py`, `src/monsoon_trends.py`, `src/climate_harvest.py`, `src/harvest_factors.py`, `notebooks/09_climate_trends.ipynb` |
+| 10b Loss-season patterns | loss seasons by region and season, weather in loss vs normal seasons | `src/loss_patterns.py`, `notebooks/10_loss_patterns.ipynb` |
 
 Every choice, with its alternatives, is in `DECISIONS.md` (D1-D22).
 
@@ -92,10 +93,20 @@ season's yield anomaly raised wheat CV skill from 2.4% to 7.3% (test 2018-22: -6
 correction); the tubewell share of irrigation added nothing. Groundwater, NDVI, fertiliser and soil data need portal
 accounts (docs/MANUAL_DOWNLOADS.md, section D).
 
+**Loss seasons: where and with what weather (descriptive).** A loss season is a district yield more than 10% below
+its trend; weather is compared with the same district's normal (z-score). Worst wheat seasons: 2014-15 (57% of area in
+loss; March cooler and much wetter than normal, i.e. harvest-time rain and hail), 2015-16 (warm nights, dry, after two
+weak monsoons), 2005-06 (very hot February); the north-west's worst was 2021-22 (March heatwave). Warm nights are the most
+consistent wheat signal (7 of 8 regions; Gangetic plain 32% of warm-night seasons were losses vs 6% of cool-night ones),
+then a weak preceding monsoon (6 of 8). In the irrigated north-west, losses come with *wet* seasons. Monsoon-rice losses
+follow rain: worst in the drought years 2002, 2015 and 2009, and when June-September rain is far below normal the loss
+rate rises to 66% in Central India (33% normally). The irrigated north-west hardly reacts (12% loss rate vs 21-36%).
+Some losses have no weather signature (rice 2008 was wet). Figures: `reports/figures/10_*.png`; notebook 10.
+
 ## 5. Application
 **Crop-Climate Risk Atlas** (`streamlit run app/app.py`): pick crop and district; see the yield trend, anomalies and loss
 years, the weather trend, heat sensitivity, risk score and zone, a +X C warming slider (0.5-3 C), and the 2018-22
-forecasts against actual yields. Live at https://crop-climate-risk-atlas.streamlit.app. A "Climate 1901-2025" tab shows the long-run warming, winters, monsoon and harvest link. Data are served from `app/atlas.sqlite`. A Tableau Public dashboard can be built from
+forecasts against actual yields. Live at https://crop-climate-risk-atlas.streamlit.app. A "Climate 1901-2025" tab shows the long-run warming, winters, monsoon and harvest link, and a "Loss years" tab shows when and where harvests failed. Data are served from `app/atlas.sqlite`. A Tableau Public dashboard can be built from
 `reports/tableau/` following `reports/tableau/TABLEAU.md`.
 
 ## 6. Limitations

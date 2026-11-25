@@ -34,7 +34,8 @@ def load():
              ("districts", "yields", "climate", "sensitivity", "scenarios", "forecasts", "meta")}
         have = {r[0] for r in con.execute("select name from sqlite_master where type='table'")}
         for n in ("clim_annual", "clim_trends", "clim_winters", "clim_hot_days", "clim_records", "clim_district_trends",
-                  "monsoon_annual", "monsoon_trends", "harvest_link"):
+                  "monsoon_annual", "monsoon_trends", "harvest_link",
+                  "loss_by_year", "loss_region_year", "loss_weather", "loss_bins"):
             t[n] = pd.read_sql(f"select * from {n}", con) if n in have else None
     t["geo"] = json.loads(GEOJSON.read_text())
     t["districts"]["state"] = t["districts"].state_id.map(STATES).fillna("Other")
@@ -68,7 +69,13 @@ if crop == "Wheat":
     layer_df["risk_score_src"] = np.where(layer_df.risk_score.notna(), "observed loss share", np.where(prop.notna(), "propagated (climate similarity)", None))
     layer_df["risk_score"] = layer_df.risk_score.fillna(prop)
 
-tab_map, tab_d, tab_clim, tab_about = st.tabs(["🗺️ Map", "📍 District", "🌡️ Climate 1901-2025", "ℹ️ About & caveats"])
+tab_map, tab_d, tab_loss, tab_clim, tab_about = st.tabs(
+    ["🗺️ Map", "📍 District", "📉 Loss years", "🌡️ Climate 1901-2025", "ℹ️ About & caveats"])
+season = lambda y: f"{int(y)}-{(int(y) + 1) % 100:02d}"      # agricultural year label, e.g. 2014 -> "2014-15"
+WX_LABEL = {"tmin_mean": "Night temperature", "tmax_mean": "Day temperature", "feb_tmax_mean": "February day temp.",
+            "mar_tmax_mean": "March day temp.", "mar_hot_days_35": "March days >= 35 °C", "rain_total": "Season rain",
+            "rain_nov_jan": "Nov-Jan rain", "prev_monsoon_rain": "Previous monsoon rain", "rain_jun_sep": "Jun-Sep rain",
+            "longest_dry_spell": "Longest dry spell", "rainy_days": "Rainy days", "hot_days_35": "Days >= 35 °C"}
 
 # ------------------------------------------------------------------ map
 with tab_map:
@@ -159,6 +166,83 @@ with tab_d:
         st.dataframe(show.round(2), hide_index=True, width="stretch")
         st.caption("Out of sample, the weather model is only marginally better than the trend for wheat (+1.8% skill) and "
                    "not better for rice. It did not anticipate the 2021-22 Punjab-Haryana heat losses.")
+
+# ------------------------------------------------------------------ loss years
+with tab_loss:
+    if T["loss_by_year"] is None:
+        st.info("Loss-pattern tables not built yet: run `python -m src.loss_patterns` then `python -m src.build_db`.")
+    else:
+        st.markdown(f"#### {crop}: when and where did harvests fail?")
+        st.caption("Loss season = district yield more than 10% below its own long-run trend. Weather is compared with the "
+                   "same district's normal (z-score), so 'hot' means hot for that district. Patterns, not proof of cause.")
+        if crop == "Wheat":
+            st.markdown(
+                "- **Warm nights** are the most consistent signal: in 7 of 8 regions loss seasons had warmer nights than normal "
+                "(Gangetic plain: 32% of warm-night seasons were losses vs 6% of cool-night seasons).\n"
+                "- **A weak monsoon before sowing** comes next (6 of 8 regions): less stored soil moisture and water.\n"
+                "- **A hot February** matters as much as a hot March in the Gangetic plain and the hills (grain filling starts).\n"
+                "- **Too much rain hurts too:** in the irrigated north-west, losses come with *wet* seasons (rain and hail near "
+                "harvest, e.g. 2014-15).\n"
+                "- Worst seasons: 2014-15 (unseasonal March rain), 2015-16 (warm and dry after two weak monsoons), "
+                "2005-06 (very hot February), 2021-22 in the north-west (March heatwave).")
+        else:
+            st.markdown(
+                "- **Rain is the main factor:** when Jun-Sep rain is far below a district's normal, loss rates jump "
+                "(Central India 66% vs 33%; east 51%; dry west 45%). Long dry spells and fewer rainy days point the same way.\n"
+                "- Loss years are also hotter by day, mostly because drought years are sunny: heat and drought come together.\n"
+                "- The irrigated north-west barely reacts (12% loss rate vs 21-36% elsewhere): irrigation buffers drought.\n"
+                "- Worst seasons: 2002, 2015, 2009 (official monsoon droughts). 2008 was wet and still had losses, so not "
+                "every loss is a weather loss.")
+        ly = T["loss_by_year"][T["loss_by_year"].crop == crop].copy()
+        ly["season"] = ly.year.map(season)
+        f1 = px.bar(ly, x="season", y=ly.share_area_in_loss * 100, color="mean_anomaly_pct", color_continuous_scale="RdBu",
+                    range_color=(-15, 15), labels={"y": "% of crop area in loss", "mean_anomaly_pct": "mean yield vs trend (%)"},
+                    title="Share of India's crop area in a loss season")
+        st.plotly_chart(f1.update_layout(height=330, xaxis_tickangle=-60, xaxis_type="category"), width="stretch")
+
+        ry = T["loss_region_year"][T["loss_region_year"].crop == crop]
+        hm = ry.pivot_table(index="region", columns="year", values="share_area_in_loss") * 100
+        f2 = px.imshow(hm, color_continuous_scale="Reds", zmin=0, zmax=100, aspect="auto",
+                       labels={"color": "% area in loss", "x": "season (start year)", "y": ""},
+                       title="Loss seasons by region (% of the region's crop area in loss)")
+        st.plotly_chart(f2.update_layout(height=380), width="stretch")
+
+        left, right = st.columns(2)
+        wx = T["loss_weather"][T["loss_weather"].crop == crop].copy()
+        wx["variable"] = wx.variable.map(WX_LABEL).fillna(wx.variable)
+        hw = wx.pivot_table(index="region", columns="variable", values="z_loss_minus_normal")
+        f3 = px.imshow(hw, color_continuous_scale="RdBu_r", zmin=-1, zmax=1, aspect="auto", text_auto=".1f",
+                       labels={"color": "z (loss - normal)", "x": "", "y": ""},
+                       title="Weather in loss seasons vs normal seasons")
+        left.plotly_chart(f3.update_layout(height=430), width="stretch")
+        left.caption("Red = higher than the district's normal in loss seasons; blue = lower. 1 = one standard deviation.")
+
+        bn = T["loss_bins"][T["loss_bins"].crop == crop].copy()
+        vopts = sorted(bn.variable.unique(), key=lambda v: list(WX_LABEL).index(v) if v in WX_LABEL else 99)
+        v = right.selectbox("Loss rate when this was low / normal / high", vopts, format_func=lambda x: WX_LABEL.get(x, x))
+        b = bn[bn.variable == v]
+        f4 = px.bar(b, x="region", y=b.loss_rate * 100, color="bin", barmode="group",
+                    category_orders={"bin": ["low (z<-1)", "normal", "high (z>1)"]},
+                    color_discrete_map={"low (z<-1)": "#4393c3", "normal": "#bbbbbb", "high (z>1)": "#d6604d"},
+                    labels={"y": "% of seasons that were losses", "region": ""})
+        right.plotly_chart(f4.update_layout(height=390, xaxis_tickangle=-35), width="stretch")
+
+        # the selected district: its loss seasons and that season's weather vs its own normal
+        yd = y_all[(y_all.unit_id == uid)].merge(T["climate"][(T["climate"].crop == crop) & (T["climate"].unit_id == uid)],
+                                                  on=["unit_id", "year"], how="left")
+        cols = [c for c in (["tmin_mean", "mar_tmax_mean", "rain_total"] if crop == "Wheat"
+                            else ["rain_jun_sep", "longest_dry_spell", "tmax_mean"]) if c in yd]
+        for c in cols:
+            yd[c] = (yd[c] - yd[c].mean()) / yd[c].std()
+        lossy = yd[yd.yield_rel_anom < -0.10].sort_values("year")
+        st.markdown(f"#### {pick}: {len(lossy)} loss seasons out of {yd.yield_rel_anom.notna().sum()}")
+        if len(lossy):
+            show = lossy[["year", "yield_rel_anom"] + cols].assign(year=lossy.year.map(season),
+                                                                   yield_rel_anom=lossy.yield_rel_anom * 100)
+            show = show.rename(columns={"year": "season", "yield_rel_anom": "yield vs trend (%)",
+                                        **{c: WX_LABEL.get(c, c) + " (z)" for c in cols}})
+            st.dataframe(show.round(1), hide_index=True, width="stretch")
+            st.caption("z above +1 = unusually high for this district; below -1 = unusually low.")
 
 # ------------------------------------------------------------------ long-run climate
 with tab_clim:

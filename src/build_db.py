@@ -108,6 +108,22 @@ def main() -> None:
             dtr = pd.read_parquet(CL / "district_trends.parquet")
             dtr[dtr.period == "annual"].drop(columns="period").rename(columns={"district_id": "unit_id"}).to_sql(
                 "clim_district_trends", con, if_exists="replace", index=False)
+        # loss-year patterns (written only if `src.loss_patterns` has been run)
+        PT = PROCESSED / "patterns"
+        if (PT / "loss_by_year_wheat.csv").exists():
+            by_year, reg_year, wx, bins = [], [], [], []
+            for crop, key in (("Wheat", "wheat"), ("Rice (monsoon)", "rice_monsoon")):
+                by_year.append(pd.read_csv(PT / f"loss_by_year_{key}.csv").assign(crop=crop))
+                ry = pd.read_csv(PT / f"loss_region_year_{key}.csv").melt(id_vars="region", var_name="year", value_name="share_area_in_loss")
+                reg_year.append(ry.assign(year=ry.year.astype(int), crop=crop))
+                c = pd.read_csv(PT / f"loss_weather_by_region_{key}.csv").set_index(["region", "loss"])
+                d = (c.xs(1, level="loss") - c.xs(0, level="loss")).reset_index().melt(id_vars="region", var_name="variable", value_name="z_loss_minus_normal")
+                wx.append(d.assign(variable=d.variable.str.removeprefix("z_"), crop=crop))
+                b = pd.read_csv(PT / f"loss_rate_by_weather_bin_{key}.csv").melt(id_vars=["region", "variable"], var_name="bin", value_name="loss_rate")
+                bins.append(b.assign(crop=crop))
+            for name, parts in (("loss_by_year", by_year), ("loss_region_year", reg_year), ("loss_weather", wx), ("loss_bins", bins)):
+                df = pd.concat(parts, ignore_index=True)
+                df[df.region != "Other"].to_sql(name, con, if_exists="replace", index=False) if "region" in df else df.to_sql(name, con, if_exists="replace", index=False)
         con.execute("CREATE INDEX IF NOT EXISTS ix_y ON yields(unit_id, crop)")
         con.execute("CREATE INDEX IF NOT EXISTS ix_c ON climate(unit_id, crop)")
         con.execute("CREATE INDEX IF NOT EXISTS ix_s ON scenarios(unit_id, crop)")
