@@ -86,7 +86,8 @@ WX_LABEL = {"tmin_mean": "Night temperature", "tmax_mean": "Day temperature", "f
 # ------------------------------------------------------------------ plain-language helpers
 st.markdown("""<style>
 .card {border-radius: 14px; padding: 18px 18px 14px; background: rgba(127,127,127,.10); height: 100%;}
-.card .big {font-size: 2.3rem; font-weight: 800; line-height: 1.1; margin: 4px 0 6px;}
+.card .big {font-size: clamp(1.15rem, 2.1vw, 2.3rem); font-weight: 800; line-height: 1.1; margin: 4px 0 6px;
+             white-space: nowrap;}
 .card .emo {font-size: 2rem;}
 .card .txt {font-size: 1.02rem; line-height: 1.35;}
 .pill {display:inline-block; padding: 4px 14px; border-radius: 999px; font-weight: 700; font-size: 1.1rem; color: #fff;}
