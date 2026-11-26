@@ -230,7 +230,7 @@ cancels out. A **change** of units in the middle of the series does not. Two lik
 - Bihar rice: state yield +125% from 2010-11 to 2011-12.
 
 The outlier rule (D11) only removes yields more than three times a district's median, so jumps of 1.5 to 2.2
-times pass through. These seasons should be checked with a robustness run of the monsoon-rice models that drops
+times pass through. These seasons were checked (DECISIONS D26) with a robustness run of the monsoon-rice models that drops
 Madhya Pradesh rice in 2022-23 and Bihar rice before 2011-12. This has not been run yet; it is listed in
 DECISIONS D25 as an open item. The wheat results are not affected in this way: Madhya Pradesh wheat 2018+ is
 already tested without (D15).
