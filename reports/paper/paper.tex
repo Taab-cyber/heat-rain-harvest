@@ -18,17 +18,17 @@
 We build a district-level panel of wheat and rice yields for India (1997--2022) from official Directorate of Economics
 and Statistics (DES) crop statistics, harmonised to fixed Census 2011 districts, and link it to India Meteorological
 Department (IMD) gridded daily weather and DES land-use irrigation statistics. Using district and year fixed effects
-with district-clustered errors, a \SI{1}{\degreeCelsius} warmer wheat-season night temperature is associated with a
+with conservatively clustered errors, a \SI{1}{\degreeCelsius} warmer wheat-season night temperature is associated with a
 4.5--5.8\% lower wheat yield across eight robustness variants. Irrigation clearly buffers monsoon rice against rainfall
 deficits (interaction $p<0.0001$), whereas evidence that irrigation protects wheat against March heat is only suggestive
 ($p=0.10$). Despite these statistically robust effects, weather explains only about 1--2\% of out-of-sample yield
 variation: on held-out years 2018--2022 the best model improves on a trend-only baseline by 1.8\% (wheat) and no model
 improves for rice, and a pre-harvest forecast missed the 2022 heatwave losses in Punjab and Haryana. Under uniform
-warming without adaptation, a fixed-effects model implies wheat yield changes of $-5.7\%$ [$-6.6$, $-4.8$] at
-\SI{+1}{\degreeCelsius} and $-11.3\%$ [$-13.2$, $-9.4$] at \SI{+2}{\degreeCelsius}. Extending IMD data back to 1951
+warming without adaptation, a district- and year-fixed-effects model implies wheat yield changes of $-5.2\%$ [$-8.4$, $-1.5$] at
+\SI{+1}{\degreeCelsius} and $-10.4\%$ [$-16.8$, $-3.2$] at \SI{+2}{\degreeCelsius}. Extending IMD data back to 1951
 (temperature) and 1901 (rainfall), India has warmed by \SI{0.075}{\degreeCelsius} per decade, winters have about 10
 fewer cool days, and heavy-rain days have increased while total monsoon rainfall shows no trend; the wheat-season night
-warming observed so far implies wheat yields about 3.4\% lower than in a 1951--80 climate. We release the pipeline and an
+warming observed so far implies wheat yields about 3.2\% lower than in a 1951--80 climate. We release the pipeline and an
 interactive Crop-Climate Risk Atlas.
 \end{abstract}
 
@@ -97,7 +97,8 @@ Our main specification is
 y_{dt} = \beta\,W_{dt} + \gamma\,(W_{dt}\times I_{dt}) + \delta\,I_{dt} + \alpha_d + \tau_t + \varepsilon_{dt},
 \end{equation}
 where $y_{dt}$ is the relative yield anomaly of district $d$ in year $t$, $W$ weather, $I$ irrigation share, $\alpha_d$
-and $\tau_t$ district and year fixed effects; standard errors are clustered by district. Classical tests (t, z, ANOVA,
+and $\tau_t$ district and year fixed effects; standard errors are clustered by district, by state, two-way by district and year, and two-way by state and
+year, and we report the widest 95\% interval. Classical tests (t, z, ANOVA,
 chi-square, multiple-testing corrections, cluster bootstrap) are reported in the supplementary notebook.
 
 \subsection{Prediction}
@@ -111,8 +112,12 @@ training years only.
 
 \subsection{Warming scenarios}
 We add \SI{1}{\degreeCelsius} or \SI{2}{\degreeCelsius} to every daily maximum and minimum temperature, recompute
-all features, and apply the fixed-effects model to the 2018--22 seasons. Uncertainty: cluster bootstrap over districts
-(300 resamples, model refitted each time).
+all features, and apply an attribution model to the 2018--22 seasons. Forecasting and attribution are kept apart: the
+forecasting models use training years only and no year effects, whereas the attribution model is fitted on all
+years with district and year fixed effects (two-way demeaning) and Ridge regularisation, because the heat measures are
+strongly collinear. Both fixed effects cancel in a scenario. We compare it with two-way OLS, a three-variable two-way
+OLS (night temperature, extreme degree days, rain) and the district-only model. Uncertainty: cluster bootstrap by
+district, by state and by year (300 resamples each, model refitted each time); we report the widest interval.
 
 \subsection{Long-run climate trends}
 All-India series are district-area-weighted means. Trends are Sen's slope per decade with the Mann--Kendall test
@@ -126,8 +131,8 @@ sowing) and the training-period tubewell share of irrigation, chosen by year-gro
 
 \section{Results}
 \subsection{Heat, rain and irrigation}
-A warmer wheat-season night is the most consistent signal: $-5.3\%$ per \SI{1}{\degreeCelsius} [95\% CI $-6.6$,
-$-4.0$] in the main sample and $-4.5\%$ to $-5.8\%$ across eight variants (Fig.~\ref{fig:robust}). Ten more days
+A warmer wheat-season night is the most consistent signal: $-5.3\%$ per \SI{1}{\degreeCelsius} [95\% CI $-9.3$,
+$-1.3$; $p=0.012$] in the main sample and $-4.5\%$ to $-5.8\%$ across eight variants (Fig.~\ref{fig:robust}). Ten more days
 above \SI{35}{\degreeCelsius} in March lower wheat yield by 1.8\% at average irrigation ($p=0.017$). In the 2022
 heatwave season Punjab and Haryana yields were 9.5\% below trend [$-11.6$, $-7.4$], while most of central India was
 near trend despite comparable extra heat. For monsoon rice, a 20\% rainfall deficit reduces yield by about 3.1\% at
@@ -171,13 +176,15 @@ historical loss frequency (0.58). The pre-harvest forecast for 2021--22 predicte
 an observed $-12.3\%$ relative to the training trend.
 
 \subsection{Warming scenarios}
-Without adaptation, modelled wheat yield changes are $-5.7\%$ [$-6.6$, $-4.8$] at \SI{+1}{\degreeCelsius} and
-$-11.3\%$ [$-13.2$, $-9.4$] at \SI{+2}{\degreeCelsius}; for monsoon rice $-4.4\%$ [$-5.7$, $-2.6$] and $-7.5\%$
-[$-10.4$, $-3.7$]. Per degree, our wheat estimate ($-5.7\%$) is close to the global estimate of about $-6.0\%$
-and our rice estimate ($-4.4\%$) somewhat larger than the global $-3.2\%$ reported by Zhao et al.\ \cite{zhao2017}
+Without adaptation, modelled wheat yield changes are $-5.2\%$ [$-8.4$, $-1.5$] at \SI{+1}{\degreeCelsius} and
+$-10.4\%$ [$-16.8$, $-3.2$] at \SI{+2}{\degreeCelsius}; for monsoon rice $-4.5\%$ [$-8.1$, $-0.8$] and $-8.6\%$
+[$-16.1$, $-0.9$]. The wheat estimate is stable across the four specifications ($-9.2\%$ to $-11.4\%$ at
+\SI{+2}{\degreeCelsius}); the rice estimate is not ($-4.1\%$ to $-8.6\%$) and should be read as uncertain. The
+monsoon-rice night-temperature effect alone is not significant ($-1.3\%$ [$-5.1$, $+2.4$]). Per degree, our wheat
+estimate ($-5.2\%$) is close to the global estimate of about $-6.0\%$ and our rice estimate ($-4.5\%$) somewhat larger than the global $-3.2\%$ reported by Zhao et al.\ \cite{zhao2017}
 (see also \cite{asseng2015}); our estimates are for India only, fixed districts and no adaptation.
-Less-irrigated districts show larger modelled losses (wheat at \SI{+2}{\degreeCelsius}: $-29\%$ below 50\% irrigation
-vs $-9\%$ above 90\%), but these are mostly hill districts, so irrigation and location are confounded.
+Less-irrigated districts show larger modelled losses (wheat at \SI{+2}{\degreeCelsius}: $-17.7\%$ below 50\% irrigation
+vs $-9.6\%$ above 90\%), but these are mostly hill districts, so irrigation and location are confounded.
 
 \subsection{Long-run climate, 1901--2025}\label{sec:longrun}
 Table~\ref{tab:longrun} summarises the trends. India's mean temperature rose by \SI{0.075}{\degreeCelsius} per decade
@@ -214,9 +221,9 @@ are 10-year means.}
 \label{fig:anom}
 \end{figure}
 
-Wheat-season (November--March) nights warmed by \SI{0.64}{\degreeCelsius} between the two normals, which implies wheat
-yields about 3.4\% lower (95\% CI 2.5--4.2\%) than in a 1951--80 climate, all else equal; for monsoon rice the implied
-effect is $-0.3\%$ [$-0.7$, $+0.05$]. Among non-weather predictors, last season's yield anomaly raised wheat
+Wheat-season (November--March) nights warmed by \SI{0.61}{\degreeCelsius} between the two normals, which implies wheat
+yields about 3.2\% lower (95\% CI 0.8--5.7\%) than in a 1951--80 climate, all else equal; for monsoon rice the implied
+effect is $-0.3\%$ [$-1.2$, $+0.6$]. Among non-weather predictors, last season's yield anomaly raised wheat
 cross-validated skill from 2.4\% to 7.3\% (test 2018--22: $-6.3\%$ to $+18.5\%$, partly by correcting trend drift),
 while the tubewell share added nothing.
 

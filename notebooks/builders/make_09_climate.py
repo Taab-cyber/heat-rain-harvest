@@ -145,7 +145,7 @@ gg.plot(column="warming_c", cmap="Reds", legend=True, ax=ax[0], legend_kwds={"sh
 gg.plot(column="implied_yield_effect_pct", cmap="RdYlGn", vmin=-8, vmax=8, legend=True, ax=ax[1], legend_kwds={"shrink": .6, "label": "%"}); ax[1].set_title("Implied wheat yield effect of that warming (%)"); ax[1].axis("off")
 save(fig, "09_map_wheat_warming_impact"); plt.show()""")
 md("""**Reading it.** The wheat season's nights have warmed by about 0.6 C on average, which at the estimated -5% per
-+1 C implies roughly a 3% (CI about 2.5-4%) drag on wheat yields compared with a 1951-80 climate - a drag that
++1 C implies roughly a 3% (95% CI about 1-6%, widest clustering, D23) drag on wheat yields compared with a 1951-80 climate - a drag that
 technology and irrigation have more than offset, since yields still doubled. The district correlation between warming
 rate and yield growth is weak and its sign is not causal evidence (fast-warming districts are also the irrigated
 north-west where yields grew fastest).""")

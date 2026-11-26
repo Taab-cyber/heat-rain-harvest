@@ -23,8 +23,8 @@ SEASONS = {"Wheat": ([11, 12, 1, 2, 3], "wheat"), "Rice (monsoon)": ([6, 7, 8, 9
 def season_tmin(dm: pd.DataFrame, months: list[int]) -> pd.DataFrame:
     s = dm[dm.month.isin(months)].copy()
     s["season"] = s.year
-    if 11 in months:      # wheat: Nov-Dec + Jan-Mar; label by harvest year (as in the crop data)
-        s["season"] = np.where(s.month >= 11, s.year + 1, s.year)
+    if 11 in months:      # wheat: Nov-Dec of Y + Jan-Mar of Y+1 -> season Y (sowing year, as in features.py / APY)
+        s["season"] = np.where(s.month >= 11, s.year, s.year - 1)
     g = s.groupby(["district_id", "season"]).agg(tmin=("tmin", "mean"), n=("tmin", "size")).reset_index()
     return g[g.n == len(months)]
 

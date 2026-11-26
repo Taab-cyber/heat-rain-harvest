@@ -35,7 +35,7 @@ def load():
         have = {r[0] for r in con.execute("select name from sqlite_master where type='table'")}
         for n in ("clim_annual", "clim_trends", "clim_winters", "clim_hot_days", "clim_records", "clim_district_trends",
                   "monsoon_annual", "monsoon_trends", "harvest_link",
-                  "loss_by_year", "loss_region_year", "loss_weather", "loss_bins"):
+                  "loss_by_year", "loss_region_year", "loss_weather", "loss_bins", "scenario_ci", "robustness"):
             t[n] = pd.read_sql(f"select * from {n}", con) if n in have else None
     t["geo"] = json.loads(GEOJSON.read_text())
     t["districts"]["state"] = t["districts"].state_id.map(STATES).fillna("Other")
@@ -110,6 +110,24 @@ def national_change(c: str, dc: float) -> float:
     return float(np.average(s[ok], weights=a[ok]))
 
 
+def scenario_range(c: str, dc: float):
+    """95% bootstrap interval (widest clustering scheme, D23) for the national change, if built."""
+    ci = T["scenario_ci"]
+    if ci is None:
+        return None
+    r = ci[(ci.crop == c) & (ci.delta_c == dc) & (ci.group == "all")]
+    return (float(r.lo.iloc[0]), float(r.hi.iloc[0])) if len(r) else None
+
+
+def night_effect(c: str = "Wheat"):
+    """Simple-model effect of +1 C warmer nights (main robustness row), with its widest 95% CI."""
+    rb = T["robustness"]
+    if rb is None:
+        return None
+    r = rb[rb.crop == c].iloc[0]
+    return float(r["effect per +1C night temp"]), float(r.ci_low), float(r.ci_high)
+
+
 def risk_level(share: float):
     if pd.isna(share):
         return "Not enough data", "#888"
@@ -130,11 +148,17 @@ with tab_home:
     c1, c2, c3, c4, c5 = st.columns(5)
     card(c1, "🌡️", f"+{warming:.1f} °C", "India is <b>warmer</b> than in the 1950s. October and November warmed the most.", RED)
     card(c2, "❄️", "10 fewer", "<b>cold days</b> every winter than our grandparents had (about 89 then, 79 now).", BLUE)
-    card(c3, "🌙", "−5%", "<b>wheat</b> for every 1 °C warmer winter night. Wheat needs cool nights to fill its grains.", RED)
-    card(c4, "🌧️", "2 in 3", "rice harvests in <b>central India</b> fail when the monsoon rain fails (normally 1 in 3).", AMBER)
+    ne = night_effect("Wheat")
+    ne_big = f"{ne[0]*100:+.0f}%".replace("-", "−") if ne else "−5%"
+    ne_rng = f" (range {ne[1]*100:+.0f}% to {ne[2]*100:+.0f}%)".replace("-", "−") if ne else ""
+    card(c3, "🌙", ne_big, f"<b>wheat</b> for every 1 °C warmer winter <b>night</b>{ne_rng}. Wheat needs cool nights to "
+         "fill its grains. <i>Simple model: night temperature only.</i>", RED)
+    card(c4, "🌧️", "2 in 3", "rice harvests in <b>central India</b> are bad years (more than 10% below normal) when the monsoon rain fails (normally 1 in 3).", AMBER)
     pct = lambda v: f"{v*100:+.0f}%".replace("-", "−")
-    card(c5, "🔮", pct(w2), f"wheat (and {pct(r2)} rice) if India gets <b>{warm:+.1f} °C</b> hotter and farmers "
-         "change nothing. Move the slider on the left to try other numbers.", RED)
+    rng_w = scenario_range("Wheat", warm)
+    rng_txt = f" (range {pct(rng_w[0])} to {pct(rng_w[1])})" if rng_w else ""
+    card(c5, "🔮", pct(w2), f"wheat{rng_txt} (and {pct(r2)} rice) if <b>every day and night</b> gets <b>{warm:+.1f} °C</b> "
+         "hotter and farmers change nothing. <i>Full model: all heat and rain measures.</i> Move the slider to try other numbers.", RED)
 
     st.markdown("### The story in four pictures")
     left, right = st.columns(2)
@@ -275,7 +299,7 @@ with tab_mine:
 # ------------------------------------------------------------------ map
 with tab_map:
     st.markdown(f"### {CROP_LABEL[crop]} across India")
-    layers = {"⚠️ How often harvests failed (% of years)": ("risk_score", 100, "Reds", False),
+    layers = {"⚠️ How often harvests were bad (>10% below normal, % of years)": ("risk_score", 100, "Reds", False),
               f"🔮 Harvest change if {warm:+.1f} °C hotter (%)": ("scenario", 100, "RdBu", True),
               "🌡️ How much 1 °C of heat hurts (% per °C)": ("heat_effect_per_c", 100, "RdBu", True),
               "🌾 Typical harvest (tonnes per hectare)": ("mean_yield", 1, "YlGn", False)}
@@ -374,7 +398,7 @@ with tab_loss:
     if T["loss_by_year"] is None:
         st.info("Loss-pattern tables not built yet: run `python -m src.loss_patterns` then `python -m src.build_db`.")
     else:
-        st.markdown(f"#### {crop}: when and where did harvests fail?")
+        st.markdown(f"#### {crop}: when and where were harvests bad (>10% below normal)?")
         st.caption("Loss season = district yield more than 10% below its own long-run trend. Weather is compared with the "
                    "same district's normal (z-score), so 'hot' means hot for that district. Patterns, not proof of cause.")
         if crop == "Wheat":
@@ -522,8 +546,17 @@ with tab_about:
     st.markdown("""
 - **Risk score** = share of 1997-2017 seasons more than 10% below the district's trend. For wheat districts with too few
   years, a value propagated from climatically similar districts is shown (validated balanced accuracy 0.64).
-- **Heat sensitivity / scenarios** come from a district-fixed-effects regression of yield anomalies on weather; national
-  estimates: wheat -5.7% at +1 °C and -11.3% at +2 °C (95% bootstrap CI -13.2 to -9.4); monsoon rice -4.4% and -7.5%.
+- **Two heat numbers, two models.** The 🌙 number is a *simple* model: yield vs night temperature and rain only, with
+  district and year effects. The 🔮 scenarios use the *full* model (all heat and rain measures: mean temperatures, degree
+  days, extreme heat, March/February heat), Ridge regression with district and year effects, and warm every day and
+  night. They answer different questions, so the numbers differ.
+- **Uncertainty**: intervals are 95% bootstrap ranges. We resampled by district, by state and by year and report the
+  widest, because neighbouring districts share weather and all districts share each year's national shocks.
+""" + "".join(
+        f"- {c}: {r.estimate*100:+.1f}% at +{r.delta_c:g} °C (95% range {r.lo*100:+.1f} to {r.hi*100:+.1f}, "
+        f"resampled by {r.ci_used})\n"
+        for c, rr in ([] if T["scenario_ci"] is None else T["scenario_ci"].query("group == 'all'").groupby("crop"))
+        for r in rr.itertuples()) + """
 - **Irrigation**: less-irrigated districts show larger losses, but they are also mostly hill districts, so this mixes
   irrigation with location.
 - Built: """ + meta["built"])

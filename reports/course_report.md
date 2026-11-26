@@ -43,11 +43,12 @@ district-years), and we state this openly (DECISIONS D3).
 | 10 Long-run climate (extension) | warming 1951-2025 by year/season/month/week/day, winters, hot days, monsoon 1901-2025, harvest link, non-weather factors | `src/climate_trends.py`, `src/monsoon_trends.py`, `src/climate_harvest.py`, `src/harvest_factors.py`, `notebooks/09_climate_trends.ipynb` |
 | 10b Loss-season patterns | loss seasons by region and season, weather in loss vs normal seasons | `src/loss_patterns.py`, `notebooks/10_loss_patterns.ipynb` |
 
-Every choice, with its alternatives, is in `DECISIONS.md` (D1-D22).
+Every choice, with its alternatives, is in `DECISIONS.md` (D1-D23).
 
 ## 4. Key results
-**Heat hurts wheat, robustly.** With district and year fixed effects and district-clustered errors, +1 C in
-wheat-season night temperature goes with **-5.3% yield (95% CI -6.6 to -4.0)**; across eight robustness variants
+**Heat hurts wheat, robustly.** With district and year fixed effects, +1 C in wheat-season night temperature goes with
+**-5.3% yield (95% CI -9.3 to -1.3; p = 0.012)**, using the widest of four error-clustering choices (district, state,
+district + year, state + year; D23); across eight robustness variants
 -4.5% to -5.8%. Ten extra days above 35 C in March: -1.8% (p = 0.017). The 2021-22 heatwave cut Punjab and Haryana
 wheat by **9.5%** below trend [-11.6, -7.4].
 
@@ -66,9 +67,14 @@ cross-validation) did not change this. The pre-harvest forecast missed the 2022 
 actual -12.3% vs trend). Explanation: real but small weather effects (about +/-2.5% for a typical +/-0.5 C year) against yield
 noise with sd about 19%.
 
-**Warming scenarios (no adaptation).** Wheat **-5.7%** [-6.6, -4.8] at +1 C, **-11.3%** [-13.2, -9.4] at +2 C;
-monsoon rice -4.4% [-5.7, -2.6] and -7.5% [-10.4, -3.7]. Less-irrigated districts lose more, but they are mostly hill
-districts (irrigation and location are confounded).
+For monsoon rice the night effect is not significant (-1.3%, CI -5.1 to +2.4): rice responds to rain.
+
+**Warming scenarios (no adaptation; two-way fixed-effects Ridge, D23).** Wheat **-5.2%** [-8.4, -1.5] at +1 C,
+**-10.4%** [-16.8, -3.2] at +2 C; monsoon rice -4.5% [-8.1, -0.8] and -8.6% [-16.1, -0.9] (95% bootstrap, widest of
+district, state and year resampling). The wheat number holds across four model specifications (-9.2% to -11.4% at
++2 C); the rice number does not (-4.1% to -8.6%), so it is uncertain. Less-irrigated districts lose more (wheat at
++2 C: -17.7% below 50% irrigation vs -9.6% above 90%), but they are mostly hill districts (irrigation and location
+are confounded).
 
 **Long-run climate (extension, 1901-2025).** Trends are Sen slopes per decade with the Mann-Kendall test, against a
 1951-1980 normal, on district-area-weighted all-India series.
@@ -86,8 +92,8 @@ districts (irrigation and location are confounded).
 | Longest June-September dry spell | -0.17 days per decade | 0.013 |
 
 Hottest years: 2009, 2010, 2016, 2024, 2017. We do not extrapolate when winters might vanish; future statements belong
-to official projections (MoES 2020, IPCC AR6). Wheat-season nights warmed by 0.64 C between the 1951-80 and 1996-2025
-normals; with the -5.3% per C effect this implies wheat yields **about 3.4% lower** (CI 2.5-4.2%) than in a 1951-80
+to official projections (MoES 2020, IPCC AR6). Wheat-season nights warmed by 0.61 C between the 1951-80 and 1996-2025
+normals; with the -5.3% per C effect this implies wheat yields **about 3.2% lower** (95% CI 0.8-5.7%) than in a 1951-80
 climate, all else equal (monsoon rice -0.3%). Of the non-weather factors available without portal accounts, last
 season's yield anomaly raised wheat CV skill from 2.4% to 7.3% (test 2018-22: -6.3% to +18.5%, partly a trend-drift
 correction); the tubewell share of irrigation added nothing. Groundwater, NDVI, fertiliser and soil data need portal

@@ -21,7 +21,7 @@ python -m src.climate_to_district
 
 step "Phase 4-8: features, leakage test, profiles, models, scenarios"
 python -m src.features
-python -m tests.test_no_leakage
+python -m pytest tests/ -q             # synthetic unit tests + leakage test on the real data
 python -m src.profiles
 python -m src.run_phase8
 python -m src.scenario_uncertainty

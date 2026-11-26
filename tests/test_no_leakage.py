@@ -4,13 +4,18 @@ Run from the project root:  python -m pytest tests/  (or: python tests/test_no_l
 """
 import numpy as np
 import pandas as pd
+import pytest
 
 from src.config import PROCESSED, TRAIN_LAST_YEAR
 from src.features import detrend_train_only
 
 
+DATA = PROCESSED / "model_wheat.parquet"
+
+
+@pytest.mark.skipif(not DATA.exists(), reason="needs data/processed (run the pipeline first)")
 def test_train_trend_ignores_test_years():
-    m = pd.read_parquet(PROCESSED / "model_wheat.parquet")
+    m = pd.read_parquet(DATA)
     a = detrend_train_only(m)
     m2 = m.copy()
     m2.loc[m2.year > TRAIN_LAST_YEAR, "yield_t_ha"] = 999.0     # wreck every test-year yield

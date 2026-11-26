@@ -49,7 +49,7 @@ python -m src.build_lus_panel        # irrigation on fixed 2011 districts
 python -m src.build_master           # wheat / rice / monsoon-rice master table
 python -m src.climate_to_district    # grid -> district daily weather (slow: ~10-20 min)
 python -m src.features               # season features, detrending, model tables
-python -m tests.test_no_leakage      # must print "ok"
+python -m pytest tests/ -q           # 10 tests: synthetic checks + leakage on real data
 python -m src.profiles               # district profiles for Phase 7
 python -m src.run_phase8             # models, classifiers, robustness, scenarios (~15 min)
 python -m src.scenario_uncertainty   # bootstrap intervals for scenarios (~10 min)

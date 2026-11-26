@@ -16,7 +16,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 from sklearn.ensemble import HistGradientBoostingClassifier, HistGradientBoostingRegressor, RandomForestRegressor
-from sklearn.linear_model import LinearRegression, LogisticRegression, RidgeCV
+from sklearn.linear_model import LinearRegression, LogisticRegression, Ridge, RidgeCV
 from sklearn.metrics import average_precision_score, balanced_accuracy_score, brier_score_loss, roc_auc_score
 from sklearn.model_selection import GridSearchCV, GroupKFold
 from sklearn.pipeline import make_pipeline
@@ -131,6 +131,84 @@ def evaluate(pred: pd.DataFrame, subset: str = "test") -> pd.DataFrame:
                      "skill vs baseline": 1 - (err ** 2).mean() / base,
                      "corr(anomaly)": np.corrcoef(rel_pred, rel_true)[0, 1] if rel_pred.std() > 0 else np.nan})
     return pd.DataFrame(rows).set_index("model")
+
+
+# ------------------------------------------------------------------ attribution model (D23)
+# Forecasting and attribution are different questions:
+#   * forecasting (fit_models above): only training years, no year effects, because a future year's
+#     national shock is unknown when you forecast. Judged by out-of-sample skill.
+#   * attribution (below): "how much does yield change when it is X degrees warmer, all else equal?"
+#     Uses every in-sample year with district AND year fixed effects, so shocks that hit all of India
+#     in one year (prices, policy, a national pest outbreak) cannot be credited to heat.
+# In a warming scenario both fixed effects cancel (same district, same year, only the weather changes),
+# so the scenario only needs the slope coefficients.
+PARSIMONIOUS = {"Wheat": ["tmin_mean", "edd", "rain_total"], "Rice (monsoon)": ["tmin_mean", "edd", "rain_total"]}
+
+
+def twoway_demean(X: pd.DataFrame, unit: np.ndarray, year: np.ndarray, tol: float = 1e-10,
+                  max_iter: int = 500) -> pd.DataFrame:
+    """Remove district and year means (two-way fixed effects) from every column.
+
+    The panel is unbalanced, so one pass is not enough: alternate unit- and year-demeaning until
+    nothing changes (method of alternating projections). The result equals the residual from
+    regressing each column on district and year dummies (Frisch-Waugh-Lovell).
+    """
+    Z = X.to_numpy(dtype=float).copy()
+    u = pd.factorize(unit)[0]
+    y = pd.factorize(year)[0]
+    nu, ny = u.max() + 1, y.max() + 1
+    cu, cy = np.bincount(u, minlength=nu)[:, None], np.bincount(y, minlength=ny)[:, None]
+    for _ in range(max_iter):
+        mu = np.zeros((nu, Z.shape[1])); np.add.at(mu, u, Z); Z -= (mu / cu)[u]
+        my = np.zeros((ny, Z.shape[1])); np.add.at(my, y, Z); Z -= (my / cy)[y]
+        mu = np.zeros((nu, Z.shape[1])); np.add.at(mu, u, Z)
+        if np.abs(mu / cu).max() < tol:
+            break
+    return pd.DataFrame(Z, index=X.index, columns=X.columns)
+
+
+def attribution_rows(m: pd.DataFrame, feats: list[str]) -> pd.DataFrame:
+    """In-sample rows (all years) with a target and every feature; target = anomaly vs full-period trend."""
+    d = m.dropna(subset=feats + ["yield_rel_anom"]).copy()
+    d["target_attr"] = d.yield_rel_anom            # descriptive trend is fine here: this is not a forecast
+    return d
+
+
+def fit_attribution(m: pd.DataFrame, feats: list[str], alpha: float | None = None,
+                    unit: np.ndarray | None = None, year: np.ndarray | None = None) -> dict:
+    """Two-way fixed-effects attribution models: OLS and Ridge on demeaned data.
+
+    `unit`/`year` can be passed to override the group labels (the bootstrap uses relabelled copies).
+    If `alpha` is given, Ridge uses it instead of choosing one by leave-years-out CV (faster for bootstrap).
+    """
+    d = attribution_rows(m, feats)
+    unit = d.unit_id.to_numpy() if unit is None else unit
+    year = d.year.to_numpy() if year is None else year
+    X = design(d, feats).drop(columns=["irr_static"])             # constant within district -> removed by FE
+    Xd = twoway_demean(X, unit, year)
+    yd = twoway_demean(d[["target_attr"]], unit, year).target_attr
+    ols = LinearRegression(fit_intercept=False).fit(Xd, yd)
+    if alpha is None:
+        ridge = make_pipeline(StandardScaler(), RidgeCV(alphas=np.logspace(-2, 4, 40),
+                                                        cv=GroupKFold(n_splits=5).split(Xd, groups=year)))
+    else:
+        ridge = make_pipeline(StandardScaler(), Ridge(alpha=alpha))
+    ridge.fit(Xd, yd)
+    return {"Two-way FE OLS": ols, "Two-way FE Ridge": ridge, "rows": d, "columns": list(X.columns)}
+
+
+class _DropIrr:
+    """Wrap an attribution model so it accepts design() output (which still has irr_static)."""
+    def __init__(self, model):
+        self.model = model
+
+    def predict(self, X: pd.DataFrame) -> np.ndarray:
+        return self.model.predict(X.drop(columns=["irr_static"], errors="ignore"))
+
+
+def attribution_model(fitted: dict, name: str = "Two-way FE Ridge"):
+    """A model usable by scenario_yields(): only differences of its predictions are meaningful."""
+    return _DropIrr(fitted[name])
 
 
 # ------------------------------------------------------------------ warming scenarios

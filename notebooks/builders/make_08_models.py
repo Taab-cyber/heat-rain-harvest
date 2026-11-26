@@ -80,7 +80,8 @@ code("""for key, name in (("wheat", "Wheat"), ("rice_monsoon", "Rice (monsoon)")
 md("""ROC-AUC 0.5 = coin flip, 1 = perfect. The baseline (each district's historical loss frequency) is hard to beat:
 knowing *where* losses usually happen is about as informative as this year's weather.""")
 
-md("""## 4. Robustness of the main heat effect (district + year fixed effects, clustered SE)""")
+md("""## 4. Robustness of the main heat effect (district + year fixed effects)
+Standard errors clustered three ways (district, state, district + year); `ci_low`/`ci_high` are the widest (D23).""")
 code("""for key, name in (("wheat", "Wheat"), ("rice_monsoon", "Rice (monsoon)")):
     r = pd.read_csv(OUT / f"robustness_{key}.csv")
     print(f"\\n{name}: effect of +1 C season night temperature on relative yield")
@@ -95,7 +96,8 @@ save(fig, "08_robustness_wheat"); plt.show()""")
 
 md("""## 5. Warming scenarios: +1 C and +2 C
 Every daily max and min temperature is raised by 1 or 2 C, the season features are recomputed from the daily data, and
-the fixed-effects model predicts the change in yield for the 2018-22 seasons. **Assumptions:** uniform warming, unchanged
+the attribution model (two-way fixed-effects Ridge with district and year effects, fitted on all years, D23) predicts
+the change in yield for the 2018-22 seasons. **Assumptions:** uniform warming, unchanged
 rain, no adaptation (same sowing dates, varieties, irrigation). Warming of 2 C lies partly outside the variation seen in
 1997-2017, so these are model extrapolations, not forecasts.""")
 code("""prof = pd.read_parquet(PROCESSED / "district_profiles.parquet")
@@ -122,13 +124,23 @@ for key, name in (("wheat", "Wheat"), ("rice_monsoon", "Rice (monsoon)")):
     ax.set_axis_off(); ax.set_title(f"{name}: modelled yield change at +2 C (% of trend)")
     save(fig, f"08_map_scenario_2C_{key}"); plt.show()""")
 
-md("""### 5b. Uncertainty: cluster bootstrap (300 resamples of districts, `src/scenario_uncertainty.py`)""")
-code("""R = pd.read_parquet(OUT / "scenario_bootstrap.parquet")
-est = R[R.b == 0].set_index(["crop", "delta_c"])[["all", "<50%", "50-90%", ">90%"]] * 100
-lo = R[R.b > 0].groupby(["crop", "delta_c"])[["all", "<50%", "50-90%", ">90%"]].quantile(.025) * 100
-hi = R[R.b > 0].groupby(["crop", "delta_c"])[["all", "<50%", "50-90%", ">90%"]].quantile(.975) * 100
-tab = est.round(1).astype(str) + " [" + lo.round(1).astype(str) + ", " + hi.round(1).astype(str) + "]"
-print("Area-weighted yield change, % of trend, with 95% bootstrap interval (columns = irrigation group)"); print(tab.to_string())""")
+md("""### 5a. Does the headline depend on the model? (`scenario_model_comparison_*.csv`, D23)
+Main = two-way (district + year) fixed-effects Ridge on all features. Compared with two-way FE OLS, a small two-way
+FE OLS (night temperature, extreme degree days, rain) and the original district-only model.""")
+code("""for key, name in (("wheat", "Wheat"), ("rice_monsoon", "Rice (monsoon)")):
+    print(f"\\n{name}: area-weighted yield change, % of trend")
+    print(pd.read_csv(OUT / f"scenario_model_comparison_{key}.csv", index_col=0).round(2).to_string())""")
+
+md("""### 5b. Uncertainty: bootstrap by district, by state and by year (300 draws each, `src/scenario_uncertainty.py`)
+Neighbouring districts share weather and every district shares each year's national shock, so we resample three ways
+and use the **widest** interval as the headline (D23).""")
+code("""C = pd.read_csv(OUT / "scenario_ci.csv")
+pc = lambda v: f"{v*100:+.1f}"
+C["estimate %"] = C.estimate.map(pc)
+for s in ("district", "state", "year"):
+    C[f"95% by {s}"] = "[" + C[f"lo_{s}"].map(pc) + ", " + C[f"hi_{s}"].map(pc) + "]"
+C["headline (widest)"] = "[" + C.lo.map(pc) + ", " + C.hi.map(pc) + "] by " + C.ci_used
+print(C[["crop", "delta_c", "group", "estimate %", "95% by district", "95% by state", "95% by year", "headline (widest)"]].to_string(index=False))""")
 md("""**Caution on the irrigation gradient.** Irrigation here is each district's fixed training-period share, and the
 least-irrigated wheat districts are mostly cool Himalayan hill districts (risk zone 4). The gradient therefore mixes
 "less irrigation" with "different climate and location", and +2 C in the hills is an extrapolation. It is consistent with

@@ -136,7 +136,7 @@ def crop_features(daily: pd.DataFrame, crop: str) -> pd.DataFrame:
             f[name] = d[d.month == mo].groupby(keys).rain.sum(min_count=1)
 
     # incomplete seasons -> missing (D13)
-    temp_cols = [c for c in f.columns if c.startswith(("tmax", "tmin", "gdd", "edd", "mar_", "hot"))]
+    temp_cols = [c for c in f.columns if c.startswith(("tmax", "tmin", "gdd", "edd", "mar_", "feb_", "hot"))]
     rain_cols = [c for c in f.columns if c.startswith(("rain", "rainy", "longest"))]
     f.loc[f.temp_missing_share > 0.10, temp_cols] = np.nan
     f.loc[f.rain_missing_share > 0.10, rain_cols] = np.nan

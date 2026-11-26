@@ -5,7 +5,9 @@ Tables
   yields       unit_id, crop, year, area_ha, yield_t_ha, trend_full, yield_rel_anom, irr_share
   climate      unit_id, crop, year, season weather features (tmax_mean, tmin_mean, gdd, edd, rain_total, ...)
   sensitivity  unit_id, crop, heat_effect_per_c  (district FE-model change in yield per +1 C, from the grid)
-  scenarios    unit_id, crop, delta_c (0.5..3.0), delta_rel_yield  (mean over 2018-22 seasons, FE model, D18)
+  scenarios    unit_id, crop, delta_c (0.5..3.0), delta_rel_yield  (mean over 2018-22 seasons, two-way FE Ridge, D23)
+  scenario_ci  crop, delta_c, group, estimate, lo, hi, ci_used, ...   (bootstrap intervals, D23)
+  robustness   crop, variant, effect per +1C night temp, ci_low, ci_high, ...   (night-temperature FE regression)
   forecasts    unit_id, crop, year, actual, trend_train, pred_ridge   (test years 2018-22)
   meta         key, value   (sources, caveats, build date)
 Everything is precomputed, so the app only reads.
@@ -16,12 +18,11 @@ import sqlite3
 
 import numpy as np
 import pandas as pd
-from sklearn.linear_model import LinearRegression
-
 from src.boundaries import load_pc11_districts
 from src.config import PROCESSED, ROOT
 from src.features import load_daily
-from src.models import FEATURES, FEATURES_V2, design, prepare, scenario_features, transform_rain
+from src.models import (FEATURES, FEATURES_V2, attribution_model, design, fit_attribution, prepare, scenario_features,
+                        transform_rain)
 
 APP = ROOT / "app"
 DB = APP / "atlas.sqlite"
@@ -33,8 +34,7 @@ def scenario_grid(daily: pd.DataFrame) -> pd.DataFrame:
     rows = []
     for crop, (feats, log_rain, key) in CHOICE.items():
         m = prepare(crop, feats, log_rain=log_rain)
-        tr = m[m.train & m.target.notna()]
-        fe = LinearRegression().fit(design(tr, feats), tr.target)
+        fe = attribution_model(fit_attribution(m, feats))       # same model as run_phase8 (D23)
         recent = m[m.year >= 2018]
         base = fe.predict(design(recent, feats))
         means = m[m.train].groupby("unit_id")[feats].mean()
@@ -88,7 +88,7 @@ def main() -> None:
                    "Weather: IMD gridded rainfall 0.25 deg (Pai et al. 2014) and temperature 1.0 deg. "
                    "Boundaries: Census 2011 district polygons, SHRUG Open Polygons v2.2 (Development Data Lab), also on AIKosh.",
         "caveats": "Districts are fixed Census 2011 units. Scenarios: uniform warming, rain unchanged, no adaptation; "
-                   "linear fixed-effects model, extrapolation beyond observed weather. Weather explains only 1-2% of "
+                   "linear model with district and year fixed effects, extrapolation beyond observed weather. Weather explains only 1-2% of "
                    "out-of-sample yield variation; forecasts are weak. Temperature grid is 1 deg (64 districts share one cell).",
     }
     with sqlite3.connect(DB) as con:
@@ -124,6 +124,14 @@ def main() -> None:
             for name, parts in (("loss_by_year", by_year), ("loss_region_year", reg_year), ("loss_weather", wx), ("loss_bins", bins)):
                 df = pd.concat(parts, ignore_index=True)
                 df[df.region != "Other"].to_sql(name, con, if_exists="replace", index=False) if "region" in df else df.to_sql(name, con, if_exists="replace", index=False)
+        # D23: intervals and the night-temperature effect, so the app reads numbers instead of hard-coding them
+        P8 = PROCESSED / "phase8"
+        if (P8 / "scenario_ci.csv").exists():
+            pd.read_csv(P8 / "scenario_ci.csv").to_sql("scenario_ci", con, if_exists="replace", index=False)
+        rob = [pd.read_csv(P8 / f"robustness_{key}.csv").assign(crop=crop)
+               for crop, (_, _, key) in CHOICE.items() if (P8 / f"robustness_{key}.csv").exists()]
+        if rob:
+            pd.concat(rob).to_sql("robustness", con, if_exists="replace", index=False)
         con.execute("CREATE INDEX IF NOT EXISTS ix_y ON yields(unit_id, crop)")
         con.execute("CREATE INDEX IF NOT EXISTS ix_c ON climate(unit_id, crop)")
         con.execute("CREATE INDEX IF NOT EXISTS ix_s ON scenarios(unit_id, crop)")

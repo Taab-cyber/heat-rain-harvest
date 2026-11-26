@@ -13,8 +13,9 @@ import statsmodels.formula.api as smf
 
 from src.config import PROCESSED, SEED
 from src.features import load_daily
-from src.models import (FEATURES, FEATURES_V2, evaluate, evaluate_classifiers, fit_classifiers, fit_models,
-                        predict, prepare, scenario_features, scenario_yields, transform_rain)
+from src.models import (FEATURES, FEATURES_V2, PARSIMONIOUS, attribution_model, evaluate, evaluate_classifiers,
+                        fit_attribution, fit_classifiers, fit_models, predict, prepare, scenario_features,
+                        scenario_yields, transform_rain)
 
 OUT = PROCESSED / "phase8"
 OUT.mkdir(exist_ok=True)
@@ -51,18 +52,38 @@ def robustness_fe(crop: str) -> pd.DataFrame:
         "area >= 5000 ha (D14)": base[base.area_ha >= 5000],
         "train years only (<= 2017)": base[base.year <= 2017],
     }
-    rows = []
-    for name, d in variants.items():
-        f = smf.ols(f"yield_rel_anom ~ {heat} + np.log1p(rain_total) + C(unit_id) + C(year)", data=d).fit(
-            cov_type="cluster", cov_kwds={"groups": d.unit_id})
-        rows.append({"variant": name, "n": int(f.nobs), "effect per +1C night temp": f.params[heat],
-                     "ci_low": f.conf_int().loc[heat, 0], "ci_high": f.conf_int().loc[heat, 1], "p": f.pvalues[heat]})
+    rows = [_fe_row(name, smf.ols(FORMULA.format(heat=heat), data=d).fit(), d, heat) for name, d in variants.items()]
     w_ = base.assign(w=base.area_ha)
-    f = smf.wls(f"yield_rel_anom ~ {heat} + np.log1p(rain_total) + C(unit_id) + C(year)", data=w_, weights=w_.w).fit(
-        cov_type="cluster", cov_kwds={"groups": w_.unit_id})
-    rows.append({"variant": "area-weighted (WLS)", "n": int(f.nobs), "effect per +1C night temp": f.params[heat],
-                 "ci_low": f.conf_int().loc[heat, 0], "ci_high": f.conf_int().loc[heat, 1], "p": f.pvalues[heat]})
+    rows.append(_fe_row("area-weighted (WLS)", smf.wls(FORMULA.format(heat=heat), data=w_, weights=w_.w).fit(), w_, heat))
     return pd.DataFrame(rows)
+
+
+FORMULA = "yield_rel_anom ~ {heat} + np.log1p(rain_total) + C(unit_id) + C(year)"
+
+
+def _fe_row(name: str, fit, d: pd.DataFrame, heat: str) -> dict:
+    """One robustness row with 95% CIs under three error-clustering choices (D23).
+
+    Errors are correlated across neighbouring districts (shared weather: 64 districts share one 1 deg
+    temperature cell) and across districts in the same year. Clustering by district alone ignores both,
+    so we also cluster by state, two-way by district + year, and two-way by state + year (spatial correlation
+    within a state AND every district sharing the year). ci_low / ci_high = the widest of the four, so every
+    number downstream uses the most conservative interval.
+    """
+    unit, state, yr = pd.factorize(d.unit_id)[0], pd.factorize(d.state_id)[0], pd.factorize(d.year)[0]
+    groups = {"district": unit, "state": state,
+              "district+year": np.column_stack([unit, yr]), "state+year": np.column_stack([state, yr])}
+    i = fit.model.exog_names.index(heat)
+    row = {"variant": name, "n": int(fit.nobs), "effect per +1C night temp": fit.params[heat]}
+    for k, g in groups.items():
+        r = fit.get_robustcov_results(cov_type="cluster", groups=g)
+        lo, hi = r.conf_int()[i]
+        row[f"ci_low_{k}"], row[f"ci_high_{k}"], row[f"p_{k}"] = lo, hi, r.pvalues[i]
+    width = {k: row[f"ci_high_{k}"] - row[f"ci_low_{k}"] for k in groups}
+    widest = max((k for k in groups if np.isfinite(width[k])), key=width.get)   # skip a failed (NaN) covariance
+    row.update({"ci_low": row[f"ci_low_{widest}"], "ci_high": row[f"ci_high_{widest}"], "p": row[f"p_{widest}"],
+                "ci_used": widest})
+    return row
 
 
 def main() -> None:
@@ -81,19 +102,38 @@ def main() -> None:
         evaluate_classifiers(clfs, m, feats).to_csv(OUT / f"eval_classifier_{key}.csv")
         robustness_fe(crop).to_csv(OUT / f"robustness_{key}.csv", index=False)
 
-        # warming scenarios with the interpretable FE regression (linear in recomputed features)
-        fe = mods["FE regression (OLS, within)"]
-        scen = []
+        # warming scenarios (D23): attribution model with district + year fixed effects.
+        # Main = two-way FE Ridge on the full feature set. The other specifications are kept as a
+        # check: if they disagree a lot with the main one, the headline number is fragile.
+        attr = fit_attribution(m, feats)
+        pm = prepare(crop, PARSIMONIOUS[crop], log_rain=log_rain)
+        attr_small = fit_attribution(pm, PARSIMONIOUS[crop])
+        specs = {
+            "MAIN: two-way FE Ridge (full features)": (attribution_model(attr, "Two-way FE Ridge"), m, feats),
+            "two-way FE OLS (full features)": (attribution_model(attr, "Two-way FE OLS"), m, feats),
+            "two-way FE OLS (tmin, EDD, rain only)": (attribution_model(attr_small, "Two-way FE OLS"), pm, PARSIMONIOUS[crop]),
+            "old: within OLS, no year FE (train years)": (mods["FE regression (OLS, within)"], m, feats),
+        }
+        scen, comp = [], []
         for dc in (1.0, 2.0):
-            fs = scenario_features("Wheat" if crop == "Wheat" else "Rice", dc, daily)
-            if log_rain:
-                fs = transform_rain(fs, feats)
-            s = scenario_yields(fe, m, feats, fs).assign(delta_c=dc)
-            scen.append(s[s.year >= 2018])                 # apply to the recent climate (2018-22 seasons)
+            fs_raw = scenario_features("Wheat" if crop == "Wheat" else "Rice", dc, daily)
+            for name, (model, mm, ff) in specs.items():
+                fs = transform_rain(fs_raw, ff) if log_rain else fs_raw
+                s = scenario_yields(model, mm, ff, fs).assign(delta_c=dc)
+                s = s[(s.year >= 2018) & s.delta_rel_yield.notna()]          # recent climate (2018-22 seasons)
+                comp.append({"spec": name, "delta_c": dc,
+                             "area_weighted_change_pct": 100 * np.average(s.delta_rel_yield, weights=s.area_ha)})
+                if name.startswith("MAIN"):
+                    scen.append(s)
         pd.concat(scen).to_parquet(OUT / f"scenarios_{key}.parquet", index=False)
+        comp = pd.DataFrame(comp).pivot(index="spec", columns="delta_c", values="area_weighted_change_pct")
+        comp.columns = [f"+{c:g}C (%)" for c in comp.columns]
+        comp.to_csv(OUT / f"scenario_model_comparison_{key}.csv")
+        print(comp.round(2).to_string())
         summary[crop] = {"features": feats, "log_rain": log_rain,
                          "best_params": {k: v.best_params_ for k, v in mods.items() if hasattr(v, "best_params_")},
-                         "ridge_alpha": float(mods["Ridge"][-1].alpha_)}
+                         "ridge_alpha": float(mods["Ridge"][-1].alpha_),
+                         "attribution_ridge_alpha": float(attr["Two-way FE Ridge"][-1].alpha_)}
         print(f"{crop}: done")
         print(ev_test.round(4).to_string())
     json.dump(summary, open(OUT / "run_summary.json", "w"), indent=2, default=str)
