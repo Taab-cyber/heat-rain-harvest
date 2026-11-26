@@ -63,8 +63,8 @@ no coordinates were used: irrigated north-west 15% loss years, MP-Bihar 34%.
 
 **Prediction is weak, and we say so.** On test years 2018-2022 the best wheat model (Ridge) beats the trend-only
 baseline by only 1.8%; no rice model beats it. One round of agronomy-driven feature engineering (selected by training-year
-cross-validation) did not change this. The pre-harvest forecast missed the 2022 Punjab-Haryana losses (forecast +3.7%,
-actual -12.3% vs trend). Explanation: real but small weather effects (about +/-2.5% for a typical +/-0.5 C year) against yield
+cross-validation) did not change this. The pre-harvest forecast missed the 2022 Punjab-Haryana losses (forecast +3.4%,
+actual -12.7% vs trend). Explanation: real but small weather effects (about +/-2.5% for a typical +/-0.5 C year) against yield
 noise with sd about 19%.
 
 For monsoon rice the night effect is not significant (-1.3%, CI -5.1 to +2.4): rice responds to rain.
