@@ -86,6 +86,38 @@ def scenarios(m: pd.DataFrame, crop: str, feats: list[str], log_rain: bool, dail
     return out
 
 
+def irrigation_interaction(m: pd.DataFrame, label: str) -> dict:
+    """Notebook 06, section 10 (rice): yield anomaly ~ monsoon deviation x irrigation + tmax + district + year FE,
+    district-clustered errors, exactly as published. Returns the cost of a monsoon 20% below normal at 20% and
+    95% irrigation, and the interaction p-value."""
+    r = m[m.in_sample].copy()
+    r["rain_dev_pct"] = r.rain_jun_sep / r.groupby("unit_id").rain_jun_sep.transform("mean") - 1
+    dr = r.dropna(subset=["yield_rel_anom", "irr_share", "rain_dev_pct", "tmax_mean"]).copy()
+    dr["irr_c"] = dr.irr_share - dr.irr_share.mean()
+    fr = smf.ols("yield_rel_anom ~ rain_dev_pct * irr_c + tmax_mean + C(unit_id) + C(year)", data=dr).fit(
+        cov_type="cluster", cov_kwds={"groups": dr.unit_id})
+    eff = lambda irr: -0.2 * (fr.params["rain_dev_pct"] + fr.params["rain_dev_pct:irr_c"] * (irr - dr.irr_share.mean())) * 100
+    return {"variant": label, "n": int(fr.nobs), "deficit20_at_20pct_irr": eff(0.2), "deficit20_at_95pct_irr": eff(0.95),
+            "interaction": fr.params["rain_dev_pct:irr_c"], "interaction_p": fr.pvalues["rain_dev_pct:irr_c"]}
+
+
+def irrigation_main() -> None:
+    m = pd.read_parquet(PROCESSED / "model_rice.parquet")
+    cases = {"drop Madhya Pradesh 2022-23": (m.state_id == 23) & (m.year == 2022),
+             "drop Bihar before 2011-12": (m.state_id == 10) & (m.year <= 2010),
+             "drop all of Odisha": m.state_id == 21}
+    cases["drop all three"] = cases["drop Madhya Pradesh 2022-23"] | cases["drop Bihar before 2011-12"] | \
+        cases["drop all of Odisha"]
+    rows = [irrigation_interaction(m, "main (as published)")]
+    for label, drop in cases.items():
+        mv = m.copy()
+        mv.loc[drop.to_numpy(), "in_sample"] = False
+        rows.append(irrigation_interaction(redetrend(mv), label))
+    res = pd.DataFrame(rows)
+    res.to_csv(OUT / "unit_switch_irrigation.csv", index=False)
+    print(res.round(4).to_string(index=False))
+
+
 def main() -> None:
     apy = pd.read_parquet(INTERIM / "apy_long.parquet")
     flags = scan(apy)
@@ -124,4 +156,5 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    import sys
+    irrigation_main() if "--irrigation" in sys.argv else main()

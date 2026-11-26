@@ -72,7 +72,7 @@ For monsoon rice the night effect is not significant (-1.3%, CI -5.1 to +2.4): r
 **Warming scenarios (no adaptation; two-way fixed-effects Ridge, D23).** Wheat **-5.2%** [-8.4, -1.5] at +1 C,
 **-10.4%** [-16.8, -3.2] at +2 C; monsoon rice -4.5% [-8.1, -0.8] and -8.6% [-16.1, -0.9] (95% bootstrap, widest of
 district, state and year resampling). The wheat number holds across four model specifications (-9.2% to -11.4% at
-+2 C); the rice number does not (-4.1% to -8.6%), so it is uncertain. Less-irrigated districts lose more (wheat at
++2 C); the rice number does not (-4.1% to -8.6%), and it falls to -6.0% when seasons with a suspected switch from rice to paddy reporting are removed (D26), so it is uncertain: roughly -6% to -9%. Less-irrigated districts lose more (wheat at
 +2 C: -17.7% below 50% irrigation vs -9.6% above 90%), but they are mostly hill districts (irrigation and location
 are confounded).
 

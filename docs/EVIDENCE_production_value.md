@@ -235,6 +235,8 @@ Madhya Pradesh rice in 2022-23 and Bihar rice before 2011-12. This has not been 
 DECISIONS D25 as an open item. The wheat results are not affected in this way: Madhya Pradesh wheat 2018+ is
 already tested without (D15).
 
+**Result of the check (D26).** With trends recomputed after removing these seasons (and, separately, all of Odisha), the rice night-temperature effect stays near -1.3% and not significant; the +2 C scenario moves from -8.6% to between -7.6% and -8.4% for each exclusion and to -6.0% with all three removed; the cost of a 20% monsoon deficit stays at about -3.1% at 20% irrigation and -0.2 to -0.3% at 95% irrigation (interaction p < 0.0001). Files: `data/processed/phase8/unit_switch_results.csv`, `unit_switch_irrigation.csv`.
+
 ---
 
 ## 11. Reproduce
