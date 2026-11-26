@@ -1,15 +1,25 @@
 # Heat, Rain & Harvest
 
-**How India's changing climate is hitting crop yields.** District-level wheat and rice yields (1997-2022) on fixed
-Census 2011 districts, linked to IMD daily weather and DES irrigation data. Includes statistical tests, risk zones,
-prediction models with honest out-of-sample evaluation, warming scenarios, and a Streamlit **Crop-Climate Risk Atlas**.
+District wheat and rice yields for India (1997-98 to 2022-23) on fixed Census 2011 districts, linked to India
+Meteorological Department daily weather and DES irrigation data. The project covers statistical tests, risk zones,
+forecasting models evaluated on unseen years, warming scenarios, long-run climate trends since 1901, and a Streamlit
+**Crop-Climate Risk Atlas** (live: https://crop-climate-risk-atlas.streamlit.app).
 
 MCA109 Data Science Foundation, TIET Patiala. Team: Mehtaab, Pravansh.
+
+**Data:** every raw, intermediate and processed file is on the release page
+https://github.com/Taab-cyber/heat-rain-harvest/releases/tag/data-v1 (10 zip archives, about 0.9 GB, with checksums).
+Unzip them into `data/` and run `bash run_all.sh`, or start from `processed.zip` alone to rerun the analysis.
+
+**The atlas** opens with the main results in English, Hindi or Punjabi, then lets you pick a district: risk of a bad
+year (more than 10% below normal), yields by season with a likely reason for each bad year, general actions linked to
+official sources (ICAR, PAU, PMFBY, PMKSY, IMD agromet, Krishi Vigyan Kendras), and a one-page PDF report. Researchers
+can download a district summary and a district-year panel as CSV under For experts.
 
 | Document | What it is |
 |---|---|
 | `PROGRESS.md` | current state, file and column names, row counts |
-| `DECISIONS.md` | every method choice (D1-D19) with alternatives and reasons |
+| `DECISIONS.md` | every method choice (D1-D24) with alternatives and reasons |
 | `LEARNING.md` | per-phase explanation and exam theory |
 | `VIVA.md` | viva questions with model answers, tough questions |
 | `reports/course_report.md` | course report |
