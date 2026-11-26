@@ -132,6 +132,12 @@ def main() -> None:
                for crop, (_, _, key) in CHOICE.items() if (P8 / f"robustness_{key}.csv").exists()]
         if rob:
             pd.concat(rob).to_sql("robustness", con, if_exists="replace", index=False)
+        # D25: production, value and food equivalent, 2022-23, checked against official totals
+        PV = PROCESSED / "value"
+        for name, f in (("value_state_check", "state_check_2022.csv"), ("value_district", "district_value_2022.csv"),
+                        ("value_india", "india_value_2022.csv"), ("value_series", "all_india_series.csv")):
+            if (PV / f).exists():
+                pd.read_csv(PV / f).to_sql(name, con, if_exists="replace", index=False)
         con.execute("CREATE INDEX IF NOT EXISTS ix_y ON yields(unit_id, crop)")
         con.execute("CREATE INDEX IF NOT EXISTS ix_c ON climate(unit_id, crop)")
         con.execute("CREATE INDEX IF NOT EXISTS ix_s ON scenarios(unit_id, crop)")

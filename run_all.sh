@@ -37,6 +37,8 @@ if [[ "${1:-}" != "--skip-longrun" ]]; then
 fi
 
 python -m src.loss_patterns
+python -m src.official_stats       # official production, MSP, cost, availability (needs data/raw/official)
+python -m src.production_value
 
 step "Phase 9: app database, Tableau exports, notebooks"
 python -m src.build_db

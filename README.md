@@ -19,7 +19,7 @@ can download a district summary and a district-year panel as CSV under For exper
 | Document | What it is |
 |---|---|
 | `PROGRESS.md` | current state, file and column names, row counts |
-| `DECISIONS.md` | every method choice (D1-D24) with alternatives and reasons |
+| `DECISIONS.md` | every method choice (D1-D25) with alternatives and reasons |
 | `LEARNING.md` | per-phase explanation and exam theory |
 | `VIVA.md` | viva questions with model answers, tough questions |
 | `reports/course_report.md` | course report |
@@ -73,6 +73,8 @@ python -m src.monsoon_trends         # monsoon 1901-2025
 python -m src.climate_harvest        # warming so far -> implied yield effect
 python -m src.harvest_factors        # previous-season yield, tubewell share
 python -m src.loss_patterns          # loss seasons by region and their weather
+python -m src.official_stats         # reads official tables (ASAG 2024, HCES 2023-24, CAG 2015) from data/raw/official
+python -m src.production_value       # production, value at MSP, margin, people-equivalent, checked vs official totals
 python -m src.build_db               # app/atlas.sqlite + app/districts.geojson
 python -m src.export_tableau         # reports/tableau/*.csv
 ```

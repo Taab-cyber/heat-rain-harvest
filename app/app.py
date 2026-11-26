@@ -98,7 +98,8 @@ def load():
         have = {r[0] for r in con.execute("select name from sqlite_master where type='table'")}
         for n in ("clim_annual", "clim_trends", "clim_winters", "clim_hot_days", "clim_records", "clim_district_trends",
                   "monsoon_annual", "monsoon_trends", "harvest_link",
-                  "loss_by_year", "loss_region_year", "loss_weather", "loss_bins", "scenario_ci", "robustness"):
+                  "loss_by_year", "loss_region_year", "loss_weather", "loss_bins", "scenario_ci", "robustness",
+                  "value_state_check", "value_district", "value_india", "value_series"):
             t[n] = pd.read_sql(f"select * from {n}", con) if n in have else None
     t["geo"] = json.loads(GEOJSON.read_text())
     t["districts"]["state"] = t["districts"].state_id.map(STATES).fillna("Other")
@@ -158,8 +159,18 @@ if crop == "Wheat":
 tab_home, tab_mine, tab_map, tab_exp = st.tabs(["Start here", "My district", "India map", "For experts"])
 with tab_exp:
     st.caption("Detailed charts, methods and data downloads.")
-    tab_d, tab_loss, tab_clim, tab_about = st.tabs(["District details", "Bad seasons", "Climate 1901-2025",
-                                                    "About, data and caveats"])
+    tab_d, tab_loss, tab_value, tab_clim, tab_about = st.tabs(
+        ["District details", "Bad seasons", "Production and value", "Climate 1901-2025", "About, data and caveats"])
+EVIDENCE_URL = "https://github.com/Taab-cyber/heat-rain-harvest/blob/main/docs/EVIDENCE_production_value.md"
+
+
+def crore(rs: float) -> str:
+    """Rupees in crore (1 crore = 10 million), e.g. 2,349 crore; lakh below one crore."""
+    return f"₹{rs / 1e7:,.0f} crore" if rs >= 1e7 else f"₹{rs / 1e5:,.1f} lakh"
+
+
+def people(n: float) -> str:
+    return f"{n / 1e7:,.1f} crore" if n >= 1e7 else f"{n / 1e5:,.1f} lakh"
 WX_LABEL = {"tmin_mean": "Night temperature", "tmax_mean": "Day temperature", "feb_tmax_mean": "February day temp.",
             "mar_tmax_mean": "March day temp.", "mar_hot_days_35": "March days >= 35 °C", "rain_total": "Season rain",
             "rain_nov_jan": "Nov-Jan rain", "prev_monsoon_rain": "Previous monsoon rain", "rain_jun_sep": "Jun-Sep rain",
@@ -354,6 +365,45 @@ with tab_mine:
         st.markdown(f"Since 1951, nights in {info.d_name} have become **{abs(nights):.1f} °C "
                     f"{'warmer' if nights >= 0 else 'cooler'}** and days {abs(days):.1f} °C "
                     f"{'warmer' if days >= 0 else 'cooler'}.")
+
+    # production, value and food equivalent, 2022-23 (D25): only where district figures match official totals
+    if T["value_district"] is not None:
+        vkey = "Wheat" if crop == "Wheat" else "Rice"
+        st.markdown(f"### Production and value, 2022-23 ({'wheat' if vkey == 'Wheat' else 'rice, all seasons'})")
+        vd = T["value_district"].query("unit_id == @uid and crop == @vkey")
+        chk = T["value_state_check"].query("crop == @vkey")
+        if vd.empty:
+            st.info("No 2022-23 production record for this district.")
+        elif not bool(vd.verified.iloc[0]):
+            r = vd.iloc[0]
+            srow = chk[chk.state == r.state]
+            if len(srow):
+                s = srow.iloc[0]
+                st.warning(f"Not shown. For {r.state}, the district figures on the DES portal add up to "
+                           f"{s.ours_mt:.2f} million tonnes, but the official state total is {s.official_mt:.2f} million "
+                           f"tonnes (Agricultural Statistics at a Glance 2024), a gap of {(s.ratio - 1) * 100:+.0f}%. "
+                           "We only show district figures that add up to the official total.")
+            else:
+                st.warning(f"Not shown: {r.reason}.")
+            st.caption(f"How this check works: {EVIDENCE_URL}")
+        else:
+            r = vd.iloc[0]
+            c1, c2, c3, c4 = st.columns(4)
+            card(c1, f"{r.production_t / 1e3:,.0f} thousand t", f"{'wheat' if vkey == 'Wheat' else 'rice'} produced "
+                 "(DES; this state's district figures match the official state total).", GREEN)
+            card(c2, crore(r.value_rs), f"value at the Minimum Support Price (₹{r.msp_rs_q:,.0f} per quintal"
+                 + (" of paddy" if vkey == "Rice" else "") + "), if all of it sold at MSP.", BLUE)
+            if pd.notna(r.margin_rs_per_acre):
+                card(c3, f"₹{r.margin_rs_per_acre:,.0f} per acre", "estimated margin over paid-out costs and family "
+                     f"labour (CACP cost A2+FL, ₹{r.cost_a2fl_rs_q:,.0f} per quintal in {r.state}).", GREEN)
+            else:
+                card(c3, "n/a", f"CACP publishes no 2022-23 cost of production for {vkey.lower()} in {r.state}.")
+            card(c4, people(r.people_equivalent) + " people", "is how many people's yearly "
+                 f"{'wheat' if vkey == 'Wheat' else 'rice'} this equals at the national average availability per person.",
+                 AMBER)
+            st.caption("Upper estimates: many farmers sell below MSP, the margin leaves out land rent and interest, and the "
+                       "harvest also goes to seed, feed, exports, stocks and losses. "
+                       f"Sources and arithmetic: {EVIDENCE_URL}")
 
     st.markdown(f"### {CROP_WORD.capitalize()} yield by season")
     f = go.Figure()
@@ -569,6 +619,44 @@ with tab_loss:
                                         **{c: WX_LABEL.get(c, c) + " (z)" for c in cols}})
             st.dataframe(show.round(1), hide_index=True, width="stretch")
             st.caption("z above +1: unusually high for this district. Below -1: unusually low.")
+
+# ------------------------------------------------------------------ production and value
+with tab_value:
+    if T["value_india"] is None:
+        st.info("Value tables not built yet: run `python -m src.official_stats`, `python -m src.production_value`, "
+                "then `python -m src.build_db`.")
+    else:
+        st.markdown("#### India, 2022-23 (official totals)")
+        vi = T["value_india"].set_index("crop")
+        rows = []
+        for c in ("Wheat", "Rice"):
+            r = vi.loc[c]
+            rows.append({"crop": c, "production (million t)": r.production_t / 1e6, "MSP (₹/quintal)": r.msp_rs_q,
+                         "value at MSP (₹ crore)": r.value_rs / 1e7, "cost A2+FL (₹/quintal)": r.cost_a2fl_rs_q,
+                         "margin at MSP (₹ crore)": r.margin_rs / 1e7,
+                         "people-equivalent (crore)": r.people_equivalent / 1e7,
+                         "availability (kg/person/yr)": r.availability_kg_per_person})
+        st.dataframe(pd.DataFrame(rows).round(2), hide_index=True, width="stretch")
+        st.caption("Rice is valued as paddy: 1 tonne of rice = 1/0.67 tonnes of paddy (out-turn ratio, CAG Report 31 of "
+                   "2015). The people-equivalent is larger than India's population because gross production also covers "
+                   "exports, government stocks, seed, feed and losses; it measures size, not who is fed.")
+
+        st.markdown("#### Do the district figures add up to the official state totals? (2022-23)")
+        ck = T["value_state_check"].copy()
+        ck["gap %"] = (ck.ratio - 1) * 100
+        st.dataframe(ck[["crop", "state", "official_mt", "ours_mt", "gap %", "verified"]].round(2), hide_index=True,
+                     width="stretch")
+        st.caption("Official: Agricultural Statistics at a Glance 2024, Tables 2.4(b) and 2.5(b). Ours: sum of district "
+                   "figures from the DES Area-Production-Yield portal. A state passes within ±5%. District production, "
+                   "value and people figures are shown only for districts in states that pass.")
+
+        s = T["value_series"]
+        f = px.line(s, x="year", y=(s.ratio - 1) * 100, color="crop", markers=True,
+                    labels={"y": "district sum vs official all-India (%)", "year": "season (start year)"},
+                    title="When did the district figures start drifting from the official totals?")
+        f.add_hline(y=5, line_dash="dot").add_hline(y=-5, line_dash="dot")
+        st.plotly_chart(f.update_layout(height=340), width="stretch")
+        st.markdown(f"Full method, every source page and every check: [evidence document]({EVIDENCE_URL}).")
 
 # ------------------------------------------------------------------ long-run climate
 with tab_clim:
