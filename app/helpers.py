@@ -131,6 +131,43 @@ def advice_keys(crop: str, bad_share: float, march_heat_pct: float | None, irr_s
     return seen[:max_items]
 
 
+def _shift_words(days: float, later: str, earlier: str) -> str:
+    if pd.isna(days):
+        return ""
+    if abs(days) < 0.5:
+        return "at about the same time"
+    return f"about {abs(days):.0f} day{'s' if round(abs(days)) != 1 else ''} {later if days > 0 else earlier}"
+
+
+def winter_sentence(name: str, then: float, now: float, start_shift: float, end_shift: float) -> str:
+    """Plain-language winter change for one district (cool days per winter, 1952-81 vs 1996-2025)."""
+    if pd.isna(then) or pd.isna(now):
+        return f"No winter record for {name}."
+    diff = now - then
+    change = (f"{abs(diff):.0f} fewer" if diff <= -0.5 else f"{diff:.0f} more" if diff >= 0.5 else "about the same")
+    text = (f"Cool days a winter in {name}: about **{then:.0f}** in 1952-81 and **{now:.0f}** in 1996-2025 "
+            f"({change}).")
+    start, end = _shift_words(start_shift, "later", "earlier"), _shift_words(end_shift, "later", "earlier")
+    if start and end:
+        text += f" Winter now starts {start} and ends {end}."
+    return text
+
+
+STATE_COLUMNS = {"state": "State", "districts": "Districts", "tmean_per_decade": "Warming, °C per decade",
+                 "tmin_per_decade": "Nights, °C per decade", "tmax_per_decade": "Days, °C per decade",
+                 "cool_days_then": "Cool days 1952-81", "cool_days_now": "Cool days 1996-2025",
+                 "start_shift_days": "Winter start shift, days (+ = later)",
+                 "end_shift_days": "Winter end shift, days (- = earlier)",
+                 "wheat_yield_effect_pct": "Wheat already lost to warmer nights (%)"}
+
+
+def state_table(states: pd.DataFrame, names: dict) -> pd.DataFrame:
+    """State climate summary with readable names and columns, fastest-warming first."""
+    s = states.assign(state=states.state_id.map(names).fillna("Other"))
+    s = s.sort_values("tmean_per_decade", ascending=False)
+    return s[list(STATE_COLUMNS)].rename(columns=STATE_COLUMNS).round(2).reset_index(drop=True)
+
+
 def latin1(text: str) -> str:
     """Make text safe for the PDF's built-in Latin-1 fonts."""
     for a, b in (("−", "-"), ("–", "-"), ("—", "-"), ("≥", ">="), ("≤", "<="), ("’", "'"), ("‘", "'"),

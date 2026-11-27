@@ -15,7 +15,8 @@ import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
 
-from helpers import (BAD, advice_keys, district_panel, district_summary, drought_bad_years, risk_level, season)
+from helpers import (BAD, advice_keys, district_panel, district_summary, drought_bad_years, risk_level, season,
+                     state_table, winter_sentence)
 from i18n import LANGS, tr
 
 # ------------------------------------------------------------------ advice (D24)
@@ -97,7 +98,7 @@ def load():
              ("districts", "yields", "climate", "sensitivity", "scenarios", "forecasts", "meta")}
         have = {r[0] for r in con.execute("select name from sqlite_master where type='table'")}
         for n in ("clim_annual", "clim_trends", "clim_winters", "clim_hot_days", "clim_records", "clim_district_trends",
-                  "monsoon_annual", "monsoon_trends", "harvest_link",
+                  "clim_district_winters", "clim_states", "monsoon_annual", "monsoon_trends", "harvest_link",
                   "loss_by_year", "loss_region_year", "loss_weather", "loss_bins", "scenario_ci", "robustness",
                   "value_state_check", "value_district", "value_india", "value_series"):
             t[n] = pd.read_sql(f"select * from {n}", con) if n in have else None
@@ -151,6 +152,10 @@ scen = T["scenarios"][(T["scenarios"].crop == crop) & (T["scenarios"].delta_c ==
 layer_df = D.set_index("unit_id").join(loss).join(scen.rename("scenario"))
 layer_df = layer_df.join(T["sensitivity"][T["sensitivity"].crop == crop].set_index("unit_id").heat_effect_per_c)
 layer_df = layer_df.join(y_all.groupby("unit_id").yield_t_ha.mean().rename("mean_yield"))
+if T["clim_district_trends"] is not None:      # climate layers: the same for every crop
+    layer_df = layer_df.join(T["clim_district_trends"].set_index("unit_id")[["tmean_per_decade", "tmin_per_decade"]])
+if T["clim_district_winters"] is not None:
+    layer_df = layer_df.join(T["clim_district_winters"].set_index("unit_id")[["cool_days_change", "start_shift_days"]])
 if crop == "Wheat":
     prop = layer_df.risk_prob_high.where(layer_df.risk_label_source == "propagated")
     layer_df["risk_score_src"] = np.where(layer_df.risk_score.notna(), "observed", np.where(prop.notna(), "propagated", None))
@@ -365,6 +370,10 @@ with tab_mine:
         st.markdown(f"Since 1951, nights in {info.d_name} have become **{abs(nights):.1f} °C "
                     f"{'warmer' if nights >= 0 else 'cooler'}** and days {abs(days):.1f} °C "
                     f"{'warmer' if days >= 0 else 'cooler'}.")
+    dwn = T["clim_district_winters"]
+    if dwn is not None and (dwn.unit_id == uid).any():
+        r = dwn[dwn.unit_id == uid].iloc[0]
+        st.markdown(winter_sentence(info.d_name, r.cool_days_then, r.cool_days_now, r.start_shift_days, r.end_shift_days))
 
     # production, value and food equivalent, 2022-23 (D25): only where district figures match official totals
     if T["value_district"] is not None:
@@ -455,12 +464,25 @@ with tab_map:
               "Typical yield (tonnes per hectare)": ("mean_yield", 1, "YlGn", False)}
     if crop == "Wheat":
         layers["Risk zones (districts grouped by climate)"] = ("zone", None, None, False)
+    if "tmean_per_decade" in layer_df:
+        layers["Climate: warming since 1951 (°C per decade)"] = ("tmean_per_decade", 1, "RdBu_r", True)
+        layers["Climate: night warming since 1951 (°C per decade)"] = ("tmin_per_decade", 1, "RdBu_r", True)
+    if "cool_days_change" in layer_df:
+        layers["Climate: cool days lost per winter (1996-2025 vs 1952-81)"] = ("cool_days_change", 1, "RdBu", True)
+        layers["Climate: how many days later winter starts (1996-2025 vs 1952-81)"] = ("start_shift_days", 1, "RdBu_r", True)
     choice = st.selectbox("Map layer", list(layers))
     st.caption({"risk_score": "Darker red: bad seasons were more frequent.",
                 "scenario": "Red: yield goes down; blue: yield goes up. Darker means a larger change.",
                 "heat_effect_per_c": "Red: warming lowers yield more.",
                 "mean_yield": "Darker green: higher yields.",
-                "zone": "Districts with a similar climate risk profile share a colour."}[layers[choice][0]]
+                "zone": "Districts with a similar climate risk profile share a colour.",
+                "tmean_per_decade": "Red: warmed faster (Sen's slope of yearly mean temperature, 1951-2025).",
+                "tmin_per_decade": "Red: nights warmed faster (Sen's slope of yearly mean minimum temperature).",
+                "cool_days_change": "Red: lost more cool days. A cool day is an Oct-Mar day colder than that "
+                                    "district's coolest quarter of the year in 1951-80, so each district is compared "
+                                    "with its own past.",
+                "start_shift_days": "Red: the first cool day of winter now comes later. Where cool days have become "
+                                    "rare (the islands, the far south) the shift is large and uncertain."}[layers[choice][0]]
                + " Grey: no data, or the crop is not grown. Hover over a district for its name.")
     col, scale, cmap, diverging = layers[choice]
     m = layer_df.reset_index()[["unit_id", "d_name", "state", col]].dropna(subset=[col])
@@ -693,6 +715,15 @@ with tab_clim:
         fw.add_scatter(x=w.season, y=w.cool_days.rolling(10, center=True).mean(), name="10-yr mean", line=dict(width=3))
         fw.update_layout(title="Cool days per winter (Oct-Mar, colder than the coolest quarter of the year in 1951-80)", height=330)
         right.plotly_chart(fw, width="stretch")
+        old_w, new_w = w[w.season.between(1952, 1981)], w[w.season.between(1996, 2025)]
+        k1, k2, k3 = st.columns(3)
+        k1.metric("Cool days per winter", f"{old_w.cool_days.mean():.0f} → {new_w.cool_days.mean():.0f}",
+                  f"{new_w.cool_days.mean() - old_w.cool_days.mean():+.0f} days", delta_color="inverse",
+                  help="All-India average, 1952-81 against 1996-2025")
+        k2.metric("Winter now starts later by", f"{new_w.first_cool_day.mean() - old_w.first_cool_day.mean():.0f} days",
+                  help="First cool day of the winter, days after 1 October, 1952-81 against 1996-2025")
+        k3.metric("Winter now ends earlier by", f"{old_w.last_cool_day.mean() - new_w.last_cool_day.mean():.0f} days",
+                  help="Last cool day of the winter, 1952-81 against 1996-2025")
 
         dtr = T["clim_district_trends"]
         if dtr is not None:
@@ -714,6 +745,20 @@ with tab_clim:
             fmn.add_scatter(x=mn.year, y=mn.jjas_mm.rolling(10, center=True).mean(), name="10-yr mean", line=dict(color="#08519c", width=3))
             fmn.update_layout(title="All-India monsoon rainfall, 1901-2025 (district-area weighted)", height=340, yaxis_range=[600, 1100])
             st.plotly_chart(fmn, width="stretch")
+            fh = go.Figure()
+            for v, label, colr in (("heavy_days", "heavy (≥64.5 mm)", "#6baed6"),
+                                   ("very_heavy_days", "very heavy (≥115.6 mm)", "#d62728")):
+                fh.add_scatter(x=mn.year, y=mn[v], name=label, line=dict(color=colr, width=1), opacity=.45)
+                fh.add_scatter(x=mn.year, y=mn[v].rolling(10, center=True).mean(), name=f"{label}, 10-yr mean",
+                               line=dict(color=colr, width=3))
+            fh.update_layout(title="Heavy-rain days per district per monsoon, 1901-2025 (IMD thresholds)", height=340,
+                             yaxis_title="days")
+            st.plotly_chart(fh, width="stretch")
+            mt9 = T["monsoon_trends"].query("period == '1901-2025'").set_index("variable")
+            st.caption(f"Total monsoon rain: no trend (p = {mt9.loc['jjas_mm', 'mk_p']:.2f}). Heavy-rain days rising "
+                       f"(p = {mt9.loc['heavy_days', 'mk_p']:.3f}), very heavy days rising "
+                       f"(p < {max(mt9.loc['very_heavy_days', 'mk_p'], 1e-4):.4f}). Same water, harder bursts. District "
+                       "averages smooth out single-station extremes, so these counts are lower than station counts.")
             mtr = T["monsoon_trends"]
             st.dataframe(mtr[mtr.period == "1951-2025"][["variable", "sen_per_decade", "mk_p"]].round(4),
                          hide_index=True, width="stretch")
@@ -723,6 +768,16 @@ with tab_clim:
             st.caption("Season night warming (1996-2025 against 1951-80) multiplied by the night-temperature coefficient. "
                        "A rough estimate: it assumes today's sensitivity also held in the past and ignores adaptation, "
                        "new varieties and CO2.")
+        if T["clim_states"] is not None:
+            st.markdown("#### By state: warming, winters and wheat")
+            stt = state_table(T["clim_states"], STATES)
+            st.dataframe(stt, hide_index=True, width="stretch")
+            st.download_button("Download state table (CSV)", stt.to_csv(index=False).encode(),
+                               file_name="state_climate_summary.csv", mime="text/csv")
+            st.caption("Climate columns are averages of the state's districts weighted by land area; the wheat column "
+                       "is weighted by wheat area (blank where little or no wheat is grown). Warming is Sen's slope "
+                       "1951-2025; winter columns compare 1996-2025 with 1952-81. In a few places with very few cool "
+                       "days left (the islands, Kerala) the start and end shifts are large and uncertain.")
 
 # ------------------------------------------------------------------ about, data and caveats
 with tab_about:

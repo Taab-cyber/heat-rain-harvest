@@ -33,6 +33,7 @@ if [[ "${1:-}" != "--skip-longrun" ]]; then
   python -m src.climate_trends
   python -m src.monsoon_trends
   python -m src.climate_harvest
+  python -m src.climate_summary    # district winter change and state summary for the atlas
   python -m src.harvest_factors
 fi
 
