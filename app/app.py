@@ -165,9 +165,11 @@ if T["clim_district_trends"] is not None:      # climate layers: the same for ev
 if T["clim_district_winters"] is not None:
     layer_df = layer_df.join(T["clim_district_winters"].set_index("unit_id")[["cool_days_change", "start_shift_days"]])
 if crop == "Wheat":
+    # Districts with too little wheat history have no observed risk score. Phase 7 guessed, from districts with a
+    # similar climate, the chance that they are high-risk (D17). That is a different quantity, so it gets its own
+    # column and map layer and is never mixed into risk_score.
     prop = layer_df.risk_prob_high.where(layer_df.risk_label_source == "propagated")
-    layer_df["risk_score_src"] = np.where(layer_df.risk_score.notna(), "observed", np.where(prop.notna(), "propagated", None))
-    layer_df["risk_score"] = layer_df.risk_score.fillna(prop)
+    layer_df["risk_est"] = prop.where(layer_df.risk_score.isna())
 
 tab_home, tab_mine, tab_map, tab_exp = st.tabs(["Start here", "My district", "India map", "For experts"])
 with tab_exp:
@@ -472,6 +474,8 @@ with tab_map:
               "Typical yield (tonnes per hectare)": ("mean_yield", 1, "YlGn", False)}
     if crop == "Wheat":
         layers["Risk zones (districts grouped by climate)"] = ("zone", None, None, False)
+        layers["Estimate only: chance of being high-risk, districts with too little wheat data (%)"] = \
+            ("risk_est", 100, "Oranges", False)
     if "tmean_per_decade" in layer_df:
         layers["Climate: warming since 1951 (°C per decade)"] = ("tmean_per_decade", 1, "RdBu_r", True)
         layers["Climate: night warming since 1951 (°C per decade)"] = ("tmin_per_decade", 1, "RdBu_r", True)
@@ -479,7 +483,12 @@ with tab_map:
         layers["Climate: cool days lost per winter (1996-2025 vs 1952-81)"] = ("cool_days_change", 1, "RdBu", True)
         layers["Climate: how many days later winter starts (1996-2025 vs 1952-81)"] = ("start_shift_days", 1, "RdBu_r", True)
     choice = st.selectbox("Map layer", list(layers))
-    st.caption({"risk_score": "Darker red: bad seasons were more frequent.",
+    st.caption({"risk_score": "Darker red: bad seasons were more frequent. Only districts with their own 1997-2017 "
+                              "yield record are coloured.",
+                "risk_est": "Not an observed record. These districts have too few wheat seasons for a risk score, so "
+                            "this is the estimated chance that they are high-risk (bad seasons in 30% or more of years), "
+                            "guessed from districts with a similar climate. In tests the guess scored 64% balanced "
+                            "accuracy, against 50% for chance. Districts with their own record are grey here.",
                 "scenario": "Red: yield goes down; blue: yield goes up. Darker means a larger change.",
                 "heat_effect_per_c": "Red: warming lowers yield more.",
                 "mean_yield": "Darker green: higher yields.",
@@ -522,6 +531,10 @@ with tab_d:
               help="Mean of 1997-2022 seasons in the analysis sample")
     c2.metric("Risk score", f"{info.risk_score:.0%}" if pd.notna(info.risk_score) else "n/a",
               help="Share of 1997-2017 seasons more than 10% below the district's trend")
+    if pd.isna(info.risk_score) and pd.notna(info.get("risk_est")):
+        st.caption(f"Too few {CROP_WORD} seasons here for a risk score. Districts with a similar climate suggest about "
+                   f"a {info.risk_est:.0%} chance that this is a high-risk district (bad seasons in 30% or more of "
+                   "years). That is an estimate, not this district's record.")
     c3.metric("Per +1 °C", f"{info.heat_effect_per_c*100:+.1f}%" if pd.notna(info.heat_effect_per_c) else "n/a",
               help="Modelled change in yield for +1 °C uniform warming, 2018-22 seasons (two-way fixed-effects Ridge, D23)")
     c4.metric(f"At +{warm:g} °C", f"{info.scenario*100:+.1f}%" if pd.notna(info.scenario) else "n/a",
@@ -818,8 +831,10 @@ with tab_about:
 **District summary** (one row per district and crop):
 `unit_id` Census 2011 district code · `district`, `state` · `crop` (Wheat or Rice (monsoon), i.e. kharif, autumn and
 winter rice) · `seasons` number of seasons with a yield · `mean_yield_t_ha` mean yield in tonnes per hectare ·
-`risk_score_pct` share of 1997-2017 seasons more than 10% below the district's trend, in % · `risk_source` observed, or
-propagated from similar districts (wheat only) · `heat_effect_pct_per_1C` modelled change in yield for every 1 °C of
+`risk_score_pct` share of 1997-2017 seasons more than 10% below the district's trend, in % (observed only) ·
+`risk_source` observed, or estimated from similar districts · `high_risk_chance_pct_est` only where there is no observed
+score (wheat only): estimated chance, in %, that the district is high-risk (bad seasons in 30% or more of years), guessed
+from districts with a similar climate; a different quantity from `risk_score_pct` · `heat_effect_pct_per_1C` modelled change in yield for every 1 °C of
 uniform warming, in % · `change_pct_at_plus_1C`, `change_pct_at_plus_2C` modelled change at +1 °C and +2 °C, in %.
 
 **District-year panel** (selected crop): one row per district and season with `yield_t_ha`, `area_ha`, `trend_full`

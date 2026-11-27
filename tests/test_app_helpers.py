@@ -52,17 +52,21 @@ def test_risk_scores_observed_and_propagated():
     r = risk_scores(yields, districts, "Wheat").set_index("unit_id")
     # district 1: bad years 2000, 2005, 2010, 2014, 2015 of 21 seasons up to 2017
     assert r.loc[1, "risk_score"] == pytest.approx(5 / 21)
-    assert r.loc[1, "risk_source"] == "observed"
-    assert r.loc[3, "risk_score"] == pytest.approx(0.7) and r.loc[3, "risk_source"] == "propagated"
+    assert r.loc[1, "risk_source"] == "observed" and pd.isna(r.loc[1, "high_risk_chance_est"])
+    # district 3 has no yields: the propagated probability is a different quantity, so it must NOT become a risk score
+    assert pd.isna(r.loc[3, "risk_score"])
+    assert r.loc[3, "high_risk_chance_est"] == pytest.approx(0.7)
+    assert r.loc[3, "risk_source"] == "estimated from similar districts"
     r_rice = risk_scores(yields, districts, "Rice (monsoon)").set_index("unit_id")
-    assert pd.isna(r_rice.loc[3, "risk_score"])                      # propagation exists for wheat only
+    assert pd.isna(r_rice.loc[3, "risk_score"]) and pd.isna(r_rice.loc[3, "high_risk_chance_est"])  # wheat only
 
 
 def test_district_summary_columns_and_units():
     yields, districts, _, sens, scen = _tables()
     s = district_summary(districts, yields, sens, scen, {3: "Punjab", 9: "Uttar Pradesh"})
     assert list(s.columns) == ["unit_id", "district", "state", "crop", "seasons", "mean_yield_t_ha", "risk_score_pct",
-                               "risk_source", "heat_effect_pct_per_1C", "change_pct_at_plus_1C", "change_pct_at_plus_2C"]
+                               "risk_source", "high_risk_chance_pct_est", "heat_effect_pct_per_1C",
+                               "change_pct_at_plus_1C", "change_pct_at_plus_2C"]
     assert len(s) == 4                                               # 2 districts x 2 crops
     a = s[(s.unit_id == 1) & (s.crop == "Wheat")].iloc[0]
     assert a.district == "Alpha" and a.state == "Punjab" and a.seasons == 26

@@ -33,18 +33,24 @@ def risk_level(share: float) -> str:
 
 
 def risk_scores(yields: pd.DataFrame, districts: pd.DataFrame, crop: str, last_year: int = 2017) -> pd.DataFrame:
-    """Share of bad years up to `last_year`, per district. For wheat, districts with too few observed years
-    take the label-propagation probability (Phase 7) and are marked 'propagated'."""
+    """Share of bad years up to `last_year`, per district (`risk_score`, observed only).
+
+    For wheat districts with no observed share, the Phase 7 label-propagation output is kept in a SEPARATE
+    column, `high_risk_chance_est`: the estimated probability that the district is a high-risk one (bad years in
+    30% or more of seasons), guessed from districts with a similar climate (D17). It is a different quantity from
+    the share of bad years, so it is never written into `risk_score`.
+    """
     y = yields[(yields.crop == crop) & (yields.year <= last_year)].dropna(subset=["yield_rel_anom"])
     obs = y.groupby("unit_id").yield_rel_anom.apply(lambda s: (s < BAD).mean()).rename("risk_score")
     out = districts[["unit_id"]].drop_duplicates().set_index("unit_id").join(obs)
     out["risk_source"] = np.where(out.risk_score.notna(), "observed", None)
+    out["high_risk_chance_est"] = np.nan
     if crop == "Wheat" and {"risk_prob_high", "risk_label_source"} <= set(districts.columns):
-        d = districts.set_index("unit_id")
+        d = districts.drop_duplicates("unit_id").set_index("unit_id")
         prop = d.risk_prob_high.where(d.risk_label_source == "propagated").reindex(out.index)
         fill = out.risk_score.isna() & prop.notna()
-        out.loc[fill, "risk_score"] = prop[fill]
-        out.loc[fill, "risk_source"] = "propagated"
+        out.loc[fill, "high_risk_chance_est"] = prop[fill]
+        out.loc[fill, "risk_source"] = "estimated from similar districts"
     return out.reset_index()
 
 
@@ -65,6 +71,7 @@ def district_summary(districts: pd.DataFrame, yields: pd.DataFrame, sensitivity:
             sc = scenarios[(scenarios.crop == crop) & (scenarios.delta_c == dc)].set_index("unit_id").delta_rel_yield
             base[f"change_pct_at_plus_{dc:g}C"] = sc.reindex(base.index) * 100
         base["risk_score_pct"] = base.pop("risk_score") * 100
+        base["high_risk_chance_pct_est"] = base.pop("high_risk_chance_est") * 100
         base["crop"] = crop
         rows.append(base.reset_index())
     out = pd.concat(rows, ignore_index=True)
@@ -72,7 +79,7 @@ def district_summary(districts: pd.DataFrame, yields: pd.DataFrame, sensitivity:
     out.insert(1, "district", out.unit_id.map(names.d_name))
     out.insert(2, "state", out.unit_id.map(names.state_id).map(states).fillna(out.unit_id.map(names.state_id).astype(str)))
     cols = ["unit_id", "district", "state", "crop", "seasons", "mean_yield_t_ha", "risk_score_pct", "risk_source",
-            "heat_effect_pct_per_1C", "change_pct_at_plus_1C", "change_pct_at_plus_2C"]
+            "high_risk_chance_pct_est", "heat_effect_pct_per_1C", "change_pct_at_plus_1C", "change_pct_at_plus_2C"]
     return out[cols].sort_values(["crop", "state", "district"]).round(3).reset_index(drop=True)
 
 
