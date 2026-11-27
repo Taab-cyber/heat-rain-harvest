@@ -147,7 +147,7 @@ least-irrigated wheat districts are mostly cool Himalayan hill districts (risk z
 irrigation reducing heat losses, but it is not a clean causal estimate of irrigation's protective effect (compare Phase 6:
 the wheat heat x irrigation interaction was not significant on its own, p = 0.10).""")
 
-md("""## 6. Summary (written after reviewing the outputs: see LEARNING.md / VIVA.md Phase 8)""")
+md("""## 6. Summary (written after reviewing the outputs: see DECISIONS.md D18-D19)""")
 
 nb["cells"] = C
 nb["metadata"]["kernelspec"] = {"name": "python3", "display_name": "Python 3"}

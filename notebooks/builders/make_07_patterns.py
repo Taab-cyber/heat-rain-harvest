@@ -215,7 +215,7 @@ W[["zone"]].to_csv(PROCESSED / "risk_zones_wheat.csv")
 P[["risk_prob_high", "risk_label_source"]].to_csv(PROCESSED / "risk_propagated_wheat.csv")""")
 
 md("""## 7. What Phase 7 found (written after reviewing outputs)
-See LEARNING.md / VIVA.md, Phase 7.""")
+Method choices: DECISIONS.md, D17.""")
 
 nb["cells"] = C
 nb["metadata"]["kernelspec"] = {"name": "python3", "display_name": "Python 3"}

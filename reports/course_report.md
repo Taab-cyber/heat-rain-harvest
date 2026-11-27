@@ -132,4 +132,4 @@ Seed 42 throughout; pinned environment (`environment.yml`); raw data never edite
 the order given in `README.md`; leakage test in `tests/`.
 
 ## 8. Team contributions
-*(Fill in: who did what. Both members should be able to explain every phase; see LEARNING.md and VIVA.md.)*
+*(Fill in: who did what. Both members can explain every phase; method choices are in DECISIONS.md.)*

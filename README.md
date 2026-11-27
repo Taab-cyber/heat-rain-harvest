@@ -18,10 +18,7 @@ can download a district summary and a district-year panel as CSV under For exper
 
 | Document | What it is |
 |---|---|
-| `PROGRESS.md` | current state, file and column names, row counts |
-| `DECISIONS.md` | every method choice (D1-D25) with alternatives and reasons |
-| `LEARNING.md` | per-phase explanation and exam theory |
-| `VIVA.md` | viva questions with model answers, tough questions |
+| `DECISIONS.md` | every method choice (D1-D28) with alternatives and reasons |
 | `reports/course_report.md` | course report |
 | `reports/paper/paper.tex` | IEEE-style paper draft (+ `references.bib`) |
 | `reports/tableau/TABLEAU.md` | how to build the Tableau Public dashboard |

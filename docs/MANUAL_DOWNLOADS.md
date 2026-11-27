@@ -99,7 +99,7 @@ has a Census 2011 district code column, so check that on the real file.
 2. Find the **Administrative Boundary Database** (district level, whole country), priced at Rs 0.
 3. Check out at Rs 0, download, and save the ZIP unextracted as `data/raw/boundaries/soi_districts.zip`.
 
-## D. Phase 10 extensions that need YOUR sign-in (not done automatically)
+## D. Phase 10 extensions that need a personal sign-in (not done automatically)
 These portals need an account, a captcha or a personal API key, so the downloads are done by the team members
 themselves. Put each file in the folder shown; the analysis code is then a short addition (DECISIONS D22).
 
