@@ -5,6 +5,7 @@ Reads only app/atlas.sqlite and app/districts.geojson (built by `python -m src.b
 Helpers without Streamlit live in app/helpers.py (tested in tests/test_app_helpers.py),
 interface text in app/i18n.py, the PDF report in app/report_pdf.py.
 """
+import importlib
 import json
 import sqlite3
 from pathlib import Path
@@ -15,6 +16,13 @@ import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
 
+import helpers
+import i18n
+
+# Streamlit Cloud keeps already-imported local modules in memory when a git push updates the app, so a new
+# function in helpers.py is missing until a reboot. Reloading the two small local modules on every run avoids that.
+importlib.reload(helpers)
+importlib.reload(i18n)
 from helpers import (BAD, advice_keys, district_panel, district_summary, drought_bad_years, risk_level, season,
                      state_table, winter_sentence)
 from i18n import LANGS, tr
